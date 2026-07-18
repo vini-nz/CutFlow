@@ -139,16 +139,21 @@ backend subindo antes do Postgres aceitar conexões — o `depends_on` com
 Confirme que `CORS_ALLOWED_ORIGINS` no `.env` bate exatamente com a URL que
 você está usando no navegador (incluindo `http://` e a porta).
 
-**"Não há chapa de Xmm cadastrada, mas o projeto tem peças dessa espessura"**
-Toda peça precisa de uma `Chapa` cadastrada com a mesma espessura no mesmo
-projeto antes de gerar o plano — o sistema nunca mistura peças de
-espessuras diferentes numa mesma chapa física (ver
-[`docs/architecture.md`](architecture.md)).
+**O plano separa as peças em mais chapas do que eu esperava**
+É proposital: o sistema nunca mistura espessuras diferentes nem acabamentos
+diferentes (liso / com veio) numa mesma chapa física — o acabamento já vem
+de fábrica na chapa (ver ADR-0004). Confira o acabamento cadastrado em cada
+peça se o número de chapas parecer alto.
 
-**"Chapas insuficientes"**
-A quantidade de chapas disponíveis cadastrada é menor do que o algoritmo
-precisa para encaixar todas as peças. Aumente `quantidadeDisponivel` no
-cadastro da chapa correspondente.
+**"Ainda existem peças de Xmm (...) neste projeto" ao excluir chapa**
+Uma chapa só pode ser excluída quando nenhuma peça daquela combinação
+espessura+acabamento existe mais — senão ela seria recriada automaticamente
+no próximo plano. Remova (ou mude a espessura/acabamento) das peças antes.
+
+**Banco criado numa versão anterior**
+Aplique `db/migrations/0002_chapa_tipo_acabamento_e_cascades.sql` ou, em
+desenvolvimento, recrie o volume: `docker compose down -v && docker compose
+up --build`.
 
 **`docker compose logs` retorna "no configuration file provided: not found"**
 O comando foi rodado fora da pasta do projeto — entre na pasta `CutFlow`

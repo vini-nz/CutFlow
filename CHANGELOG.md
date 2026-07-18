@@ -1,5 +1,41 @@
 # Changelog
 
+## [0.3.0] — Correção veio/liso + plano em tempo real
+
+Correções a partir do teste de uso real (feedback de 16/07/2026):
+
+- **Correção de domínio (bug):** peça com veio e peça lisa da mesma espessura
+  eram encaixadas na mesma chapa. O acabamento (liso/com veio) já vem de
+  fábrica na chapa; agora `Chapa` é identificada por espessura **e**
+  acabamento, o auto-provisionamento é por combinação e o plano agrupa por
+  combinação — veio e liso nunca dividem chapa (ADR-0004)
+- **Correção (bug):** após gerar um plano, remover peça falhava por FK
+  (`posicionamentos.peca_id`) e o erro era engolido pelo frontend — o
+  projeto ficava "travado" no primeiro plano. Planos agora são descartados
+  em toda mutação de peça/chapa (dado derivado) + cascades de segurança no
+  banco + erros de remoção exibidos na tela
+- **Plano em tempo real:** o plano é regenerado automaticamente (debounce de
+  600ms) a cada peça/chapa criada, editada ou removida; o botão "Gerar plano
+  de corte" passa a ser um "forçar geração"
+- **Exclusão de chapa** (`DELETE /chapas/{uuid}`), permitida quando não
+  restam peças da combinação (409 explicativo caso contrário)
+- **Edição e duplicação de peça** na tela do projeto (o PUT já existia na
+  API; agora tem UI)
+- Visualização e PDF mostram o acabamento de cada chapa ("15mm · com veio");
+  resumo ao vivo inclui o total de chapas necessárias
+- Testes novos: veio/liso nunca compartilham chapa; mutação de peça descarta
+  planos antes de deletar
+- Migração para bancos existentes:
+  `db/migrations/0002_chapa_tipo_acabamento_e_cascades.sql`
+
+## [0.2.0] — Chapa sem estoque e auto-provisionada (ADR-0003)
+
+- `Chapa` perde `quantidadeDisponivel`; algoritmo abre quantas chapas forem
+  necessárias, sem teto de negócio
+- Chapa auto-provisionada por espessura ao salvar peça; sem criação manual
+  (listagem com edição de largura/altura/kerf/margem)
+- Resumo ao vivo de peças (total, liso/veio, por espessura) no frontend
+
 ## [0.1.0] — MVP
 
 - Cadastro de Projeto, Chapa (por espessura) e Peça
