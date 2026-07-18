@@ -20,9 +20,18 @@ import java.util.List;
  *   orientacao original;
  * - kerf e descontado em toda divisao de espaço livre gerada por um corte;
  * - margem de borda e aplicada uma vez, no retangulo inicial da chapa.
+ *
+ * Desde a ADR-0003, nao ha mais teto de "chapas disponiveis": o algoritmo
+ * abre quantas chapas forem necessarias para encaixar todas as pecas - e'
+ * justamente esse numero que o marceneiro-piloto quer descobrir, nao um
+ * limite que ele precisa adivinhar antes. MAX_CHAPAS_SEGURANCA existe so
+ * como guarda defensiva contra um bug de encaixe que gerasse loop infinito,
+ * nunca como regra de negocio.
  */
 @Component
 public class GuillotineOtimizadorDePlano implements OtimizadorDePlano {
+
+    private static final int MAX_CHAPAS_SEGURANCA = 500;
 
     @Override
     public ResultadoOtimizacao gerar(ParametrosChapa chapaParams, List<PecaParaEmpacotar> pecas) {
@@ -44,10 +53,12 @@ public class GuillotineOtimizadorDePlano implements OtimizadorDePlano {
         int numeroEtiqueta = 1;
 
         for (int numeroChapa = 1; !restantes.isEmpty(); numeroChapa++) {
-            if (numeroChapa > chapaParams.quantidadeDisponivel()) {
-                throw new BusinessRuleException(
-                        "Chapas insuficientes: seriam necessárias pelo menos %d chapas, mas há apenas %d disponíveis."
-                                .formatted(numeroChapa, chapaParams.quantidadeDisponivel()));
+            if (numeroChapa > MAX_CHAPAS_SEGURANCA) {
+                // Nunca deveria acontecer em uso real (ver expandirEValidar:
+                // toda peca cabe sozinha numa chapa vazia, entao o encaixe
+                // sempre progride). Guarda defensiva, nao regra de negocio.
+                throw new IllegalStateException(
+                        "Otimizador excedeu %d chapas - possível bug no encaixe.".formatted(MAX_CHAPAS_SEGURANCA));
             }
 
             ResultadoBin bin = empacotarUmaChapa(restantes, larguraUtil, alturaUtil,

@@ -8,7 +8,6 @@ package com.cutflow.optimizer;
 public record ParametrosChapa(
         int larguraMm,
         int alturaMm,
-        int quantidadeDisponivel,
         int kerfMm,
         int margemBordaMm
 ) {}

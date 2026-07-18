@@ -5,6 +5,7 @@ import com.cutflow.dto.planodecorte.PlanoDeCorteResponse;
 import com.cutflow.dto.planodecorte.PosicionamentoResponse;
 import com.cutflow.dto.planodecorte.SobraResponse;
 import com.cutflow.entity.Projeto;
+import com.cutflow.enums.TipoAcabamento;
 import com.lowagie.text.Chunk;
 import com.lowagie.text.Document;
 import com.lowagie.text.Element;
@@ -64,8 +65,10 @@ public class PlanoDeCortePdfService {
             document.add(new Paragraph(" "));
 
             for (ChapaUtilizadaResponse chapa : plano.chapas()) {
-                document.add(new Paragraph("Chapa %d — %dx%dmm, %dmm"
-                        .formatted(chapa.numeroChapa(), chapa.larguraMm(), chapa.alturaMm(), chapa.espessuraMm()),
+                String acabamento = chapa.tipoAcabamento() == TipoAcabamento.COM_VEIO ? "com veio" : "liso";
+                document.add(new Paragraph("Chapa %d — %dx%dmm, %dmm (%s)"
+                        .formatted(chapa.numeroChapa(), chapa.larguraMm(), chapa.alturaMm(), chapa.espessuraMm(),
+                                acabamento),
                         chapaTitleFont));
                 document.add(new Paragraph("Aproveitamento: %s%%".formatted(chapa.percentualAproveitamento()), normalFont));
                 document.add(new Paragraph(" "));

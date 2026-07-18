@@ -38,10 +38,13 @@ CREATE TRIGGER trg_projetos_updated_at
 -- DOMÍNIO: CHAPAS E PEÇAS
 -- ============================================================================
 
--- Uma chapa por espessura dentro do projeto: o marceneiro-piloto usa sempre
--- a mesma medida de chapa (274x184cm) e só varia a espessura (6/15/18/25mm) -
--- confirmado na entrevista (doc secao 3.1). A constraint abaixo trava essa
--- regra no banco.
+-- Uma chapa por combinacao espessura+acabamento dentro do projeto: o
+-- marceneiro-piloto usa sempre a mesma medida de chapa (274x184cm), variando
+-- a espessura (6/15/18/25mm) - confirmado na entrevista (doc secao 3.1). O
+-- acabamento (LISO/COM_VEIO) e caracteristica fisica que ja vem de fabrica
+-- na chapa (ADR-0004): peca com veio so sai de chapa com veio, entao a chapa
+-- e identificada pela combinacao, nunca so pela espessura. A constraint
+-- abaixo trava essa regra no banco.
 CREATE TABLE chapas (
     id                     BIGSERIAL PRIMARY KEY,
     uuid                   UUID NOT NULL UNIQUE DEFAULT gen_random_uuid(),
@@ -49,8 +52,9 @@ CREATE TABLE chapas (
     largura_mm             INTEGER NOT NULL CHECK (largura_mm > 0),
     altura_mm              INTEGER NOT NULL CHECK (altura_mm > 0),
     espessura_mm           INTEGER NOT NULL CHECK (espessura_mm IN (6, 15, 18, 25)),
+    tipo_acabamento        VARCHAR(20) NOT NULL DEFAULT 'LISO'
+                           CHECK (tipo_acabamento IN ('LISO', 'COM_VEIO')),
     material               VARCHAR(30) NOT NULL DEFAULT 'MDF',
-    quantidade_disponivel  INTEGER NOT NULL CHECK (quantidade_disponivel >= 0),
     kerf_mm                INTEGER NOT NULL DEFAULT 4 CHECK (kerf_mm >= 0),
     margem_borda_mm        INTEGER NOT NULL DEFAULT 6 CHECK (margem_borda_mm >= 0),
     created_at             TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -58,7 +62,8 @@ CREATE TABLE chapas (
 );
 
 CREATE INDEX idx_chapas_projeto_id ON chapas(projeto_id);
-CREATE UNIQUE INDEX uq_chapas_projeto_espessura ON chapas(projeto_id, espessura_mm);
+CREATE UNIQUE INDEX uq_chapas_projeto_espessura_acabamento
+    ON chapas(projeto_id, espessura_mm, tipo_acabamento);
 
 CREATE TRIGGER trg_chapas_updated_at
     BEFORE UPDATE ON chapas
@@ -107,11 +112,16 @@ CREATE INDEX idx_planos_de_corte_projeto_id ON planos_de_corte(projeto_id);
 
 -- ----------------------------------------------------------------------------
 
+-- chapa_id/peca_id (abaixo) cascateiam de proposito: um plano e uma foto
+-- derivada de pecas/chapas no momento da geracao. A camada de servico ja
+-- descarta os planos do projeto em toda mutacao de peca/chapa (ADR-0004);
+-- o cascade e a rede de seguranca no banco para nunca bloquear a exclusao
+-- de uma peca/chapa por causa de um plano obsoleto.
 CREATE TABLE chapas_utilizadas (
     id                          BIGSERIAL PRIMARY KEY,
     uuid                        UUID NOT NULL UNIQUE DEFAULT gen_random_uuid(),
     plano_de_corte_id           BIGINT NOT NULL REFERENCES planos_de_corte(id) ON DELETE CASCADE,
-    chapa_id                    BIGINT NOT NULL REFERENCES chapas(id),
+    chapa_id                    BIGINT NOT NULL REFERENCES chapas(id) ON DELETE CASCADE,
     numero_chapa                INTEGER NOT NULL CHECK (numero_chapa > 0),
     area_desperdicada_mm2       BIGINT NOT NULL CHECK (area_desperdicada_mm2 >= 0),
     percentual_aproveitamento   NUMERIC(5,2) NOT NULL
@@ -125,7 +135,7 @@ CREATE TABLE posicionamentos (
     id                     BIGSERIAL PRIMARY KEY,
     uuid                   UUID NOT NULL UNIQUE DEFAULT gen_random_uuid(),
     chapa_utilizada_id     BIGINT NOT NULL REFERENCES chapas_utilizadas(id) ON DELETE CASCADE,
-    peca_id                BIGINT NOT NULL REFERENCES pecas(id),
+    peca_id                BIGINT NOT NULL REFERENCES pecas(id) ON DELETE CASCADE,
     numero_etiqueta        INTEGER NOT NULL CHECK (numero_etiqueta > 0),
     x_mm                   INTEGER NOT NULL CHECK (x_mm >= 0),
     y_mm                   INTEGER NOT NULL CHECK (y_mm >= 0),

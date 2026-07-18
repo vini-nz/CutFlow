@@ -1,5 +1,6 @@
 package com.cutflow.entity;
 
+import com.cutflow.enums.TipoAcabamento;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -9,12 +10,22 @@ import java.time.OffsetDateTime;
 import java.util.UUID;
 
 /**
- * Especificacao de chapa disponivel para um projeto (uma por espessura - ver
- * constraint uq_chapas_projeto_espessura no DDL). Mistura catalogo (medida
- * padrao) com estoque (quantidadeDisponivel) de proposito: o marceneiro-piloto
- * compra chapa por projeto, nao mantem estoque parado (doc secao 4.3,
- * "Observacao critica"). Se o uso de sobras entre projetos crescer, separar
- * Material (catalogo) de Chapa (estoque) fica candidato a V2.
+ * Especificacao de chapa usada num projeto - uma por combinacao de espessura
+ * e tipo de acabamento (ver constraint uq_chapas_projeto_espessura_acabamento
+ * no DDL). Puramente catalogo (medida, kerf, margem) - nao ha nocao de
+ * estoque/quantidade disponivel (ver ADR-0003).
+ *
+ * O acabamento (LISO / COM_VEIO) e' uma caracteristica FISICA da chapa que ja
+ * vem de fabrica, nao algo aplicado depois (ADR-0004): uma peca com veio so
+ * pode sair de uma chapa com veio, e uma peca lisa de uma chapa lisa. Por
+ * isso o plano de corte nunca mistura acabamentos na mesma chapa, assim como
+ * nunca mistura espessuras.
+ *
+ * E' auto-provisionada com valores padrao (ver DEFAULT_* em ChapaService) na
+ * primeira vez que uma Peca da combinacao espessura+acabamento e' criada - o
+ * usuario nao precisa cadastrar uma Chapa antes de gerar o plano. A listagem
+ * continua visivel na UI, com "Editar" (largura/altura/kerf/margem) e
+ * "Excluir" (apenas quando nenhuma peca da combinacao existir mais).
  */
 @Entity
 @Table(name = "chapas")
@@ -43,11 +54,12 @@ public class Chapa {
     @Column(name = "espessura_mm", nullable = false)
     private Integer espessuraMm;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "tipo_acabamento", nullable = false, length = 20)
+    private TipoAcabamento tipoAcabamento = TipoAcabamento.LISO;
+
     @Column(nullable = false, length = 30)
     private String material = "MDF";
-
-    @Column(name = "quantidade_disponivel", nullable = false)
-    private Integer quantidadeDisponivel;
 
     // Confirmado na entrevista (doc secao 3.2): 4mm e o padrao real perdido
     // pela esquadrejadeira entre dois cortes; fica configuravel porque o

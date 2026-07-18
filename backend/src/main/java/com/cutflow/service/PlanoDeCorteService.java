@@ -11,6 +11,7 @@ import com.cutflow.entity.PlanoDeCorte;
 import com.cutflow.entity.Posicionamento;
 import com.cutflow.entity.Projeto;
 import com.cutflow.entity.Sobra;
+import com.cutflow.enums.TipoAcabamento;
 import com.cutflow.exception.BusinessRuleException;
 import com.cutflow.exception.ResourceNotFoundException;
 import com.cutflow.optimizer.ChapaEmpacotada;
@@ -20,7 +21,6 @@ import com.cutflow.optimizer.PecaParaEmpacotar;
 import com.cutflow.optimizer.PosicionamentoCalculado;
 import com.cutflow.optimizer.ResultadoOtimizacao;
 import com.cutflow.optimizer.SobraCalculada;
-import com.cutflow.repository.ChapaRepository;
 import com.cutflow.repository.ChapaUtilizadaRepository;
 import com.cutflow.repository.PecaRepository;
 import com.cutflow.repository.PlanoDeCorteRepository;
@@ -33,20 +33,25 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
  * Orquestra a geracao do plano de corte: agrupa as pecas do projeto por
- * espessura (regra confirmada na entrevista - plano nunca mistura pecas de
- * espessuras diferentes numa mesma chapa, doc secao 3.1), casa cada grupo
- * com a Chapa de mesma espessura, delega o encaixe ao OtimizadorDePlano e
- * persiste o resultado.
+ * espessura E tipo de acabamento (ADR-0004) - o plano nunca mistura pecas de
+ * espessuras diferentes numa mesma chapa (doc secao 3.1) nem pecas com veio
+ * com pecas lisas (o acabamento ja vem de fabrica na chapa: peca com veio so
+ * pode sair de chapa com veio). Cada grupo e' casado com a Chapa da mesma
+ * combinacao, o encaixe e' delegado ao OtimizadorDePlano e o resultado
+ * persistido.
  *
- * Cada chamada a gerar() cria um PlanoDeCorte novo (sem versionamento/
- * comparacao entre planos no MVP - ver docs/architecture.md).
+ * Cada chamada a gerar() cria um PlanoDeCorte novo, e as mutacoes de peca/
+ * chapa descartam os planos anteriores (invalidacao, ADR-0004) - sem
+ * versionamento/comparacao entre planos no MVP (ver docs/architecture.md).
  */
 @Service
 @RequiredArgsConstructor
@@ -54,7 +59,7 @@ public class PlanoDeCorteService {
 
     private final ProjetoService projetoService;
     private final PecaRepository pecaRepository;
-    private final ChapaRepository chapaRepository;
+    private final ChapaService chapaService;
     private final PlanoDeCorteRepository planoDeCorteRepository;
     private final ChapaUtilizadaRepository chapaUtilizadaRepository;
     private final PosicionamentoRepository posicionamentoRepository;
@@ -70,12 +75,19 @@ public class PlanoDeCorteService {
         }
 
         Map<Long, Peca> pecaPorId = pecas.stream().collect(Collectors.toMap(Peca::getId, p -> p));
-        Map<Integer, List<Peca>> pecasPorEspessura = pecas.stream()
-                .collect(Collectors.groupingBy(Peca::getEspessuraMm));
+        // TreeMap para ordem deterministica das chapas no plano: espessura
+        // crescente e, dentro dela, LISO antes de COM_VEIO.
+        Map<ChaveGrupo, List<Peca>> pecasPorGrupo = pecas.stream()
+                .collect(Collectors.groupingBy(
+                        p -> new ChaveGrupo(p.getEspessuraMm(), p.getTipoAcabamento()),
+                        () -> new TreeMap<>(Comparator
+                                .comparing(ChaveGrupo::espessuraMm)
+                                .thenComparing(ChaveGrupo::tipoAcabamento)),
+                        Collectors.toList()));
 
         List<GrupoEmpacotado> grupos = new ArrayList<>();
-        for (Map.Entry<Integer, List<Peca>> entry : pecasPorEspessura.entrySet()) {
-            grupos.add(empacotarGrupo(projeto.getId(), entry.getKey(), entry.getValue()));
+        for (Map.Entry<ChaveGrupo, List<Peca>> entry : pecasPorGrupo.entrySet()) {
+            grupos.add(empacotarGrupo(projeto.getId(), projeto, entry.getKey(), entry.getValue()));
         }
 
         PlanoDeCorte plano = new PlanoDeCorte();
@@ -104,10 +116,11 @@ public class PlanoDeCorteService {
         return new PlanoObtidoParaPdf(projeto, montarResposta(plano));
     }
 
-    private GrupoEmpacotado empacotarGrupo(Long projetoId, Integer espessuraMm, List<Peca> pecasDoGrupo) {
-        Chapa chapa = chapaRepository.findByProjetoIdAndEspessuraMm(projetoId, espessuraMm)
-                .orElseThrow(() -> new BusinessRuleException(
-                        "Não há chapa de %dmm cadastrada, mas o projeto tem peças dessa espessura".formatted(espessuraMm)));
+    private GrupoEmpacotado empacotarGrupo(Long projetoId, Projeto projeto, ChaveGrupo chave, List<Peca> pecasDoGrupo) {
+        // Rede de seguranca: em fluxo normal a Chapa ja foi auto-provisionada
+        // por PecaService ao salvar a primeira peca dessa combinacao
+        // espessura+acabamento (ADR-0003/ADR-0004).
+        Chapa chapa = chapaService.garantirChapa(projetoId, projeto, chave.espessuraMm(), chave.tipoAcabamento());
 
         List<PecaParaEmpacotar> entrada = pecasDoGrupo.stream()
                 .map(p -> new PecaParaEmpacotar(p.getId(), p.getNome(), p.getLarguraMm(), p.getAlturaMm(),
@@ -115,7 +128,7 @@ public class PlanoDeCorteService {
                 .toList();
 
         ParametrosChapa params = new ParametrosChapa(
-                chapa.getLarguraMm(), chapa.getAlturaMm(), chapa.getQuantidadeDisponivel(),
+                chapa.getLarguraMm(), chapa.getAlturaMm(),
                 chapa.getKerfMm(), chapa.getMargemBordaMm());
 
         ResultadoOtimizacao resultado = otimizadorDePlano.gerar(params, entrada);
@@ -205,6 +218,8 @@ public class PlanoDeCorteService {
 
         return PlanoDeCorteResponse.from(plano, chapasResponse);
     }
+
+    private record ChaveGrupo(Integer espessuraMm, TipoAcabamento tipoAcabamento) {}
 
     private record GrupoEmpacotado(Chapa chapa, ResultadoOtimizacao resultado) {}
 

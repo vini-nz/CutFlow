@@ -1,6 +1,7 @@
 package com.cutflow.dto.chapa;
 
 import com.cutflow.entity.Chapa;
+import com.cutflow.enums.TipoAcabamento;
 
 import java.util.UUID;
 
@@ -9,8 +10,8 @@ public record ChapaResponse(
         Integer larguraMm,
         Integer alturaMm,
         Integer espessuraMm,
+        TipoAcabamento tipoAcabamento,
         String material,
-        Integer quantidadeDisponivel,
         Integer kerfMm,
         Integer margemBordaMm
 ) {
@@ -20,8 +21,8 @@ public record ChapaResponse(
                 chapa.getLarguraMm(),
                 chapa.getAlturaMm(),
                 chapa.getEspessuraMm(),
+                chapa.getTipoAcabamento(),
                 chapa.getMaterial(),
-                chapa.getQuantidadeDisponivel(),
                 chapa.getKerfMm(),
                 chapa.getMargemBordaMm());
     }

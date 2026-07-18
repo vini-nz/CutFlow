@@ -1,6 +1,7 @@
 package com.cutflow.dto.planodecorte;
 
 import com.cutflow.entity.ChapaUtilizada;
+import com.cutflow.enums.TipoAcabamento;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -12,6 +13,7 @@ public record ChapaUtilizadaResponse(
         Integer larguraMm,
         Integer alturaMm,
         Integer espessuraMm,
+        TipoAcabamento tipoAcabamento,
         Long areaDesperdicadaMm2,
         BigDecimal percentualAproveitamento,
         List<PosicionamentoResponse> posicionamentos,
@@ -25,6 +27,7 @@ public record ChapaUtilizadaResponse(
                 cu.getChapa().getLarguraMm(),
                 cu.getChapa().getAlturaMm(),
                 cu.getChapa().getEspessuraMm(),
+                cu.getChapa().getTipoAcabamento(),
                 cu.getAreaDesperdicadaMm2(),
                 cu.getPercentualAproveitamento(),
                 posicionamentos,
