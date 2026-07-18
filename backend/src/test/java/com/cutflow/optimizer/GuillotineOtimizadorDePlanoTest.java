@@ -22,7 +22,7 @@ class GuillotineOtimizadorDePlanoTest {
     private final GuillotineOtimizadorDePlano otimizador = new GuillotineOtimizadorDePlano();
 
     // Caso real do doc (introducao): armario de cozinha do marceneiro-piloto.
-    private static final ParametrosChapa CHAPA_PADRAO = new ParametrosChapa(1840, 2740, 10, 4, 6);
+    private static final ParametrosChapa CHAPA_PADRAO = new ParametrosChapa(1840, 2740, 4, 6);
 
     @Test
     void gerar_casoRealArmarioCozinha_naoSobrepoeENaoExtrapolaLimites() {
@@ -77,17 +77,21 @@ class GuillotineOtimizadorDePlanoTest {
     }
 
     @Test
-    void gerar_quandoChapasDisponiveisInsuficientes_lancaBusinessRuleException() {
-        ParametrosChapa chapaComUmaUnidade = new ParametrosChapa(1840, 2740, 1, 4, 6);
-        // Area util por chapa ~= (1840-12)*(2740-12) ~= 4,97 m2; cada peca usa
-        // 1840x1360mm (quase metade da chapa), entao 6 pecas exigem 3+ chapas.
+    void gerar_quandoPecasExcedemUmaChapa_abreQuantasChapasForemNecessarias() {
+        // ADR-0003: nao ha mais teto de "chapas disponiveis" - o otimizador
+        // sempre abre chapas ate encaixar tudo. Area util por chapa ~=
+        // (1840-12)*(2740-12) ~= 4,97 m2; cada peca usa 1840x1360mm (quase
+        // metade da chapa), entao 6 pecas exigem 3+ chapas.
         List<PecaParaEmpacotar> pecas = List.of(
                 new PecaParaEmpacotar(1L, "Painel", 1800, 1300, 6, TipoAcabamento.LISO)
         );
 
-        assertThatThrownBy(() -> otimizador.gerar(chapaComUmaUnidade, pecas))
-                .isInstanceOf(BusinessRuleException.class)
-                .hasMessageContaining("Chapas insuficientes");
+        ResultadoOtimizacao resultado = otimizador.gerar(CHAPA_PADRAO, pecas);
+
+        assertThat(resultado.chapas().size()).isGreaterThanOrEqualTo(3);
+        assertThat(resultado.chapas().stream()
+                .flatMap(c -> c.posicionamentos().stream())
+                .count()).isEqualTo(6);
     }
 
     @Test
