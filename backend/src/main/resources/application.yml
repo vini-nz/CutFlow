@@ -1,0 +1,34 @@
+server:
+  port: 8080
+  servlet:
+    context-path: /
+
+spring:
+  application:
+    name: cutflow-backend
+
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:cutflow}
+    username: ${DB_USER:cutflow}
+    password: ${DB_PASSWORD:cutflow}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate   # o schema é criado pelo db/cutflow_ddl.sql, nunca pelo Hibernate
+    properties:
+      hibernate:
+        format_sql: true
+        jdbc:
+          time_zone: UTC
+    show-sql: ${SHOW_SQL:false}
+
+logging:
+  level:
+    root: INFO
+    com.cutflow: DEBUG
+
+cutflow:
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173}

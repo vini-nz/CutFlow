@@ -1,0 +1,17 @@
+{
+  "name": "CutFlow — Plano de Corte",
+  "short_name": "CutFlow",
+  "description": "Gerador de plano de corte para marcenarias",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#fffbeb",
+  "theme_color": "#b45309",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
