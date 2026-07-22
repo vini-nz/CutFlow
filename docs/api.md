@@ -1,13 +1,48 @@
 # Referência da API
 
-Base URL: `http://localhost:8080/api/v1`
+Base URL: `/api/v1` (mesma origem da SPA, via proxy — ver
+[ADR-0005](adr/0005-multi-tenant-e-autenticacao.md)).
 
-Sem autenticação no MVP (ver [ADR-0001](adr/0001-sem-autenticacao-no-mvp.md)).
-Todas as respostas de erro seguem o formato:
+**Autenticação por sessão** (cookie `JSESSIONID` httpOnly). Toda rota fora de
+`/auth/login|register|csrf|config` e do fluxo OAuth exige login e devolve
+`401` se não houver sessão. Requisições que alteram estado (POST/PUT/DELETE)
+exigem o header CSRF `X-XSRF-TOKEN` com o valor do cookie `XSRF-TOKEN` (o
+cliente axios já faz isso automaticamente; obtenha o cookie com
+`GET /auth/csrf` antes do primeiro POST).
+
+Tudo é escopado pela **organização ativa** do usuário: um recurso de outra
+organização devolve `404`. Respostas de erro seguem o formato:
 
 ```json
 { "status": 409, "error": "Conflict", "message": "...", "timestamp": "..." }
 ```
+
+## Autenticação
+
+| Método | Rota | Descrição |
+|---|---|---|
+| `GET` | `/auth/csrf` | Emite o cookie `XSRF-TOKEN` (204). Chame antes do primeiro POST |
+| `GET` | `/auth/config` | `{ googleHabilitado }` — se o login Google está ativo |
+| `POST` | `/auth/register` | Cria conta local — `{ nome, email, senha }` (senha ≥ 8) |
+| `POST` | `/auth/login` | Login local — `{ email, senha }`; abre sessão e retorna a sessão |
+| `POST` | `/auth/logout` | Encerra a sessão (204) |
+| `GET` | `/auth/me` | Sessão atual (usuário, organizações, organização ativa) |
+| — | `/oauth2/authorization/google` | Início do login Google (navegação de página, não XHR) |
+
+`401` em `/auth/login` = credenciais inválidas.
+
+## Organizações (workspaces) e equipe
+
+| Método | Rota | Descrição |
+|---|---|---|
+| `GET` | `/organizacoes` | Organizações das quais o usuário é membro (com o papel dele) |
+| `POST` | `/organizacoes` | Cria organização — `{ nome, documento? }`; o criador vira OWNER e ela fica ativa |
+| `POST` | `/organizacoes/{uuid}/ativar` | Troca o workspace ativo |
+| `GET` | `/organizacoes/{uuid}/membros` | Lista a equipe (qualquer membro) |
+| `POST` | `/organizacoes/{uuid}/membros` | Adiciona membro — `{ email, papel? }` (OWNER/ADMIN; a pessoa precisa já ter conta) |
+| `DELETE` | `/organizacoes/{uuid}/membros/{membroUuid}` | Remove membro (OWNER/ADMIN; não remove o OWNER) |
+
+Papéis: `OWNER`, `ADMIN`, `MEMBRO`. `403` quando falta permissão.
 
 ---
 

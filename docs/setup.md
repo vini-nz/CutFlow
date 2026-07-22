@@ -60,9 +60,16 @@ no caso do `db` e do `backend`).
 
 ### 5. Acesse o sistema
 
-Abra **http://localhost:5173** no navegador. O projeto de demonstração
-("Armário Cozinha João") já aparece na lista — abra-o e clique em "Gerar
-plano de corte" para ver o algoritmo funcionando de ponta a ponta.
+Abra **http://localhost:5173** no navegador e entre com a conta de
+demonstração (ADR-0005):
+
+- **E-mail:** `demo@cutflow.app`
+- **Senha:** `demo1234`
+
+Ela já é dona da organização "Marcenaria Demo", onde o projeto de demonstração
+("Armário Cozinha João") aparece na lista — abra-o e clique em "Gerar plano de
+corte" para ver o algoritmo de ponta a ponta. Você também pode criar sua
+própria conta em "Criar conta" e, no onboarding, criar sua marcenaria.
 
 ### 6. Para encerrar
 
@@ -83,8 +90,16 @@ docker compose down -v
 | Variável | Descrição | Padrão |
 |---|---|---|
 | `DB_NAME` / `DB_USER` / `DB_PASSWORD` | Credenciais do PostgreSQL | `cutflow` |
-| `CORS_ALLOWED_ORIGINS` | Origem permitida para chamadas ao backend | `http://localhost:5173` |
-| `VITE_API_URL` | URL base da API usada pelo frontend | `http://localhost:8080/api/v1` |
+| `CORS_ALLOWED_ORIGINS` | Origem(ns) permitida(s) para o backend | `http://localhost:5173` |
+| `FRONTEND_URL` | Para onde o backend redireciona após login Google | `http://localhost:5173` |
+| `VITE_API_URL` | Base da API no frontend (relativa, mesma origem) | `/api/v1` |
+| `VITE_PROXY_TARGET` | Alvo do proxy do Vite para o backend | `http://backend:8080` (compose) |
+| `SESSION_COOKIE_SECURE` | Cookie de sessão só via HTTPS (`true` em prod) | `false` |
+| `SESSION_COOKIE_SAMESITE` | Política SameSite do cookie de sessão | `lax` |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Credenciais do login Google (opcional) | vazio |
+
+Publicação em produção (HTTPS, mesma origem, hospedagem) em
+[`deploy.md`](deploy.md).
 
 ---
 
@@ -122,12 +137,29 @@ npm install
 npm run dev
 ```
 
-O Vite sobe em `http://localhost:5173` e já aponta para
-`http://localhost:8080/api/v1` por padrão.
+O Vite sobe em `http://localhost:5173` e faz proxy de `/api`, `/oauth2` e do
+callback do Google para `http://localhost:8080` (`VITE_PROXY_TARGET`), para que
+o navegador veja SPA e API na mesma origem — necessário para os cookies de
+sessão (ADR-0005).
 
 ---
 
 ## Solução de problemas
+
+**Não consigo logar / cai de volta no login (sessão não "gruda")**
+Login por sessão exige mesma origem. Em dev, acesse pela porta do frontend
+(`http://localhost:5173`), não pela do backend, e deixe o proxy do Vite fazer o
+resto. Em produção, sirva SPA e API atrás do mesmo domínio (ver
+[`deploy.md`](deploy.md)).
+
+**403 ao salvar/criar algo, mas o login funcionou (erro de CSRF)**
+A SPA busca o cookie `XSRF-TOKEN` (`GET /auth/csrf`) antes do primeiro POST e o
+axios reenvia no header `X-XSRF-TOKEN`. Se estiver chamando a API por fora da
+SPA, replique esse par cookie/header.
+
+**Botão "Entrar com Google" não aparece**
+É proposital quando `GOOGLE_CLIENT_ID` está vazio — só o login local funciona.
+Configure as credenciais (ver [`deploy.md`](deploy.md)) para habilitar.
 
 **`backend` fica em loop de restart**
 Veja os logs (`docker compose logs backend`). Na maioria das vezes é o
@@ -151,9 +183,10 @@ espessura+acabamento existe mais — senão ela seria recriada automaticamente
 no próximo plano. Remova (ou mude a espessura/acabamento) das peças antes.
 
 **Banco criado numa versão anterior**
-Aplique `db/migrations/0002_chapa_tipo_acabamento_e_cascades.sql` ou, em
-desenvolvimento, recrie o volume: `docker compose down -v && docker compose
-up --build`.
+Aplique as migrações em `db/migrations/` na ordem
+(`0002_chapa_tipo_acabamento_e_cascades.sql`, depois
+`0003_multi_tenant_auth.sql`) ou, em desenvolvimento, recrie o volume:
+`docker compose down -v && docker compose up --build`.
 
 **`docker compose logs` retorna "no configuration file provided: not found"**
 O comando foi rodado fora da pasta do projeto — entre na pasta `CutFlow`

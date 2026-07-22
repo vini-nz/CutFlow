@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.4.0] — Contas, organizações (multi-tenant) e equipe
+
+Preparação para deploy (ADR-0005):
+
+- **Autenticação:** login por e-mail/senha (BCrypt) e por Google (OAuth2/OIDC,
+  opcional), por sessão com cookie httpOnly + CSRF por cookie/header. Sem JWT
+- **Multi-tenant:** `Usuario` global, `Organizacao` como tenant, `Membro` com
+  papéis OWNER/ADMIN/MEMBRO. Todo `Projeto` pertence a uma organização; um
+  usuário alterna entre organizações por um seletor de workspace
+- **Escopo de acesso** aplicado num único ponto (`ProjetoService` pela
+  organização ativa), protegendo peças/chapas/planos transitivamente — recurso
+  de outra organização devolve 404
+- **Backend:** entidades/repos de identidade, `SecurityConfig`,
+  `OrganizacaoContexto`, `AuthController` e `OrganizacaoController` (criar
+  organização, trocar ativa, gerenciar equipe); DDL + migração
+  `0003_multi_tenant_auth.sql` + seed com conta demo (`demo@cutflow.app`)
+- **Frontend:** telas de login/cadastro (+ botão Google condicional),
+  onboarding de organização, seletor de workspace, tela de equipe, rotas
+  protegidas; `axios` com cookies + CSRF; proxy do Vite para mesma origem
+- **Docs:** ADR-0005, `docs/deploy.md` (recomendação de hospedagem), api.md e
+  setup atualizados
+- Migração para bancos existentes: `db/migrations/0003_multi_tenant_auth.sql`
+
 ## [0.3.0] — Correção veio/liso + plano em tempo real
 
 Correções a partir do teste de uso real (feedback de 16/07/2026):

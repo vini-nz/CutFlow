@@ -15,6 +15,9 @@ técnico — mesmo padrão de engenharia usado no [FlowOps](../FlowOps).
 
 ## Funcionalidades
 
+- **Contas e organizações (multi-tenant):** login por e-mail/senha ou Google,
+  cada usuário com uma ou mais marcenarias (workspaces) e equipe com papéis
+  (dono/administrador/membro) — ver [ADR-0005](docs/adr/0005-multi-tenant-e-autenticacao.md)
 - Cadastro de projetos, chapas (por espessura) e peças
 - Geração automática do plano de corte com heurística **Guillotine**
   (cortes retos de ponta a ponta, reproduzindo a esquadrejadeira manual),
@@ -30,7 +33,7 @@ técnico — mesmo padrão de engenharia usado no [FlowOps](../FlowOps).
 
 ## Tecnologias
 
-**Backend** — Java 21 · Spring Boot 3 · Spring Data JPA · PostgreSQL · OpenPDF
+**Backend** — Java 21 · Spring Boot 3 · Spring Security (sessão + OAuth2/Google) · Spring Data JPA · PostgreSQL · OpenPDF
 
 **Frontend** — React 18 · Vite · Tailwind CSS · Axios · Canvas HTML5
 
@@ -48,15 +51,13 @@ cp .env.example .env
 docker compose up --build
 ```
 
-A aplicação fica disponível em:
-
-| Serviço | URL |
-|---|---|
-| Frontend | http://localhost:5173 |
-| Backend (API) | http://localhost:8080 |
+A aplicação fica disponível em http://localhost:5173 (a SPA fala com a API na
+mesma origem, via proxy). Conta de demonstração já no seed:
+**demo@cutflow.app / demo1234**.
 
 Guia completo de instalação, variáveis de ambiente e solução de problemas em
-[`docs/setup.md`](docs/setup.md).
+[`docs/setup.md`](docs/setup.md); publicação em produção em
+[`docs/deploy.md`](docs/deploy.md).
 
 ---
 
@@ -80,13 +81,16 @@ CutFlow/
 | [`docs/architecture.md`](docs/architecture.md) | Decisões arquiteturais e o porquê de cada uma |
 | [`docs/adr/`](docs/adr/) | Registros formais de decisões de arquitetura (ADRs) |
 | [`docs/api.md`](docs/api.md) | Referência dos endpoints da API |
+| [`docs/deploy.md`](docs/deploy.md) | Publicação em produção e recomendação de hospedagem |
 | [`CHANGELOG.md`](CHANGELOG.md) | Histórico de versões |
 
 ## Roadmap
 
 - [x] MVP — cadastro de projeto/chapa/peça, algoritmo Guillotine, visualização, PDF
-- [ ] Validação com o marceneiro-piloto em pelo menos 3 projetos reais
-- [ ] V2 — fita de borda, estoque de sobras entre projetos, histórico/comparação de planos, importação CSV
+- [x] Correção veio/liso + plano em tempo real (validado com projeto real do marceneiro-piloto)
+- [x] Contas, organizações (multi-tenant) e equipe — pré-deploy ([ADR-0005](docs/adr/0005-multi-tenant-e-autenticacao.md))
+- [ ] Deploy em produção para uso do marceneiro-piloto ([`docs/deploy.md`](docs/deploy.md))
+- [ ] V2 — fita de borda, estoque de sobras entre projetos, histórico/comparação de planos, importação CSV, convite de membro por e-mail
 - [ ] V3 — múltiplas alternativas de plano, etiquetas com QR Code, bloco financeiro/comercial
 
 Detalhes e critérios de cada fase em
