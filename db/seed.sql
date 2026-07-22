@@ -1,11 +1,30 @@
 -- ============================================================================
 -- CutFlow — dados de demonstração
 -- Reproduz o exemplo de armário de cozinha usado na entrevista com o
--- marceneiro-piloto (doc introdução), para servir de primeiro caso de teste.
+-- marceneiro-piloto (doc introdução), agora dentro de uma organização com um
+-- usuário de demonstração (ADR-0005).
+--
+-- Login de demonstração:  demo@cutflow.app  /  demo1234
+-- (o hash abaixo é BCrypt de "demo1234"; TROQUE em produção.)
 -- ============================================================================
 
-INSERT INTO projetos (nome, cliente) VALUES
-    ('Armário Cozinha João', 'João');
+INSERT INTO usuarios (nome, email, senha_hash) VALUES
+    ('Marceneiro Demo', 'demo@cutflow.app',
+     '$2b$10$vpgLZRCP21TyaVaOmYNt7.tykyeqqs.HS1jUNDdtgo9w7wWw2.qn2');
+
+INSERT INTO organizacoes (nome, documento) VALUES
+    ('Marcenaria Demo', NULL);
+
+-- Usuário demo é OWNER da organização demo.
+INSERT INTO membros (usuario_id, organizacao_id, papel)
+SELECT u.id, o.id, 'OWNER'
+FROM usuarios u, organizacoes o
+WHERE u.email = 'demo@cutflow.app' AND o.nome = 'Marcenaria Demo';
+
+-- Projeto demo pertence à organização demo.
+INSERT INTO projetos (organizacao_id, nome, cliente)
+SELECT o.id, 'Armário Cozinha João', 'João'
+FROM organizacoes o WHERE o.nome = 'Marcenaria Demo';
 
 -- Uma chapa por combinacao espessura+acabamento (ADR-0004): as pecas de 15mm
 -- do projeto demo existem nos dois acabamentos, entao ha duas chapas de 15mm.

@@ -8,12 +8,18 @@ import lombok.Setter;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
+/**
+ * Uma marcenaria/empresa (ADR-0005). E' o tenant do sistema: todo Projeto
+ * pertence a uma Organizacao, e um Usuario so enxerga projetos das
+ * organizacoes das quais e' Membro. O "documento" (CNPJ) e' opcional - o
+ * cadastro nao deve travar quem ainda nao quer informar dados fiscais.
+ */
 @Entity
-@Table(name = "projetos")
+@Table(name = "organizacoes")
 @Getter
 @Setter
 @NoArgsConstructor
-public class Projeto {
+public class Organizacao {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -22,19 +28,12 @@ public class Projeto {
     @Column(nullable = false, unique = true)
     private UUID uuid;
 
-    // Tenant do projeto (ADR-0005): todo projeto pertence a uma organizacao;
-    // o escopo por organizacao ativa e' aplicado em ProjetoService e protege
-    // transitivamente pecas/chapas/planos, que sempre resolvem o projeto por
-    // ProjetoService.findOrThrow.
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "organizacao_id", nullable = false)
-    private Organizacao organizacao;
-
     @Column(nullable = false, length = 150)
     private String nome;
 
-    @Column(length = 150)
-    private String cliente;
+    // Opcional (CNPJ ou outro identificador fiscal); nao e' chave de login.
+    @Column(length = 30)
+    private String documento;
 
     @Column(name = "created_at", nullable = false, insertable = false, updatable = false)
     private OffsetDateTime createdAt;

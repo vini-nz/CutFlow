@@ -1,7 +1,18 @@
 server:
   port: 8080
+  # Atrás de proxy (Vite em dev, reverse proxy em prod): usa X-Forwarded-* para
+  # montar corretamente a URL base (redirect_uri do OAuth, etc.).
+  forward-headers-strategy: framework
   servlet:
     context-path: /
+    session:
+      cookie:
+        name: JSESSIONID
+        http-only: true            # cookie de sessão nunca acessível a JavaScript
+        # Lax funciona quando frontend e backend estão no mesmo site/domínio.
+        # Para deploy cross-site (domínios diferentes), use None + secure=true.
+        same-site: ${SESSION_COOKIE_SAMESITE:lax}
+        secure: ${SESSION_COOKIE_SECURE:false}   # true em produção (HTTPS)
 
 spring:
   application:
@@ -32,3 +43,13 @@ logging:
 cutflow:
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173}
+  # Para onde o backend redireciona após o login Google (a SPA).
+  frontend-url: ${FRONTEND_URL:http://localhost:5173}
+  # Login Google (ADR-0005). Registrado programaticamente em OAuth2ClientConfig
+  # SOMENTE quando client-id não está vazio - sem credenciais o backend sobe
+  # normalmente e só o login local funciona. Não usa
+  # spring.security.oauth2.client.* de propósito: uma registration com id vazio
+  # ali faz o Boot falhar na validação em vez de simplesmente ignorar.
+  google:
+    client-id: ${GOOGLE_CLIENT_ID:}
+    client-secret: ${GOOGLE_CLIENT_SECRET:}

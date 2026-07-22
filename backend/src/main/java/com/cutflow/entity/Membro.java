@@ -1,5 +1,6 @@
 package com.cutflow.entity;
 
+import com.cutflow.enums.PapelMembro;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -8,12 +9,17 @@ import lombok.Setter;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
+/**
+ * Vinculo N:N entre Usuario e Organizacao, com o papel do usuario naquela
+ * organizacao (ADR-0005). A constraint unica (usuario, organizacao) garante
+ * um unico vinculo por par - trocar o papel edita o Membro existente.
+ */
 @Entity
-@Table(name = "projetos")
+@Table(name = "membros")
 @Getter
 @Setter
 @NoArgsConstructor
-public class Projeto {
+public class Membro {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -22,19 +28,17 @@ public class Projeto {
     @Column(nullable = false, unique = true)
     private UUID uuid;
 
-    // Tenant do projeto (ADR-0005): todo projeto pertence a uma organizacao;
-    // o escopo por organizacao ativa e' aplicado em ProjetoService e protege
-    // transitivamente pecas/chapas/planos, que sempre resolvem o projeto por
-    // ProjetoService.findOrThrow.
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "usuario_id", nullable = false)
+    private Usuario usuario;
+
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "organizacao_id", nullable = false)
     private Organizacao organizacao;
 
-    @Column(nullable = false, length = 150)
-    private String nome;
-
-    @Column(length = 150)
-    private String cliente;
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private PapelMembro papel = PapelMembro.MEMBRO;
 
     @Column(name = "created_at", nullable = false, insertable = false, updatable = false)
     private OffsetDateTime createdAt;

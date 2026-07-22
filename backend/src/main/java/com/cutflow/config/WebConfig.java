@@ -3,13 +3,18 @@ package com.cutflow.config;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.web.servlet.config.annotation.CorsRegistry;
-import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
+import java.util.Arrays;
+import java.util.List;
 
 /**
- * MVP sem autenticacao (ver docs/architecture.md, secao "Por que sem login") -
- * o unico ponto de seguranca necessario por enquanto e CORS liberado apenas
- * para a origem do frontend configurada.
+ * CORS do CutFlow. Desde o login por sessao (ADR-0005) o CORS precisa permitir
+ * credenciais (cookies) e, por isso, listar origens explicitas - nunca "*",
+ * que e' incompativel com allowCredentials. O SecurityConfig referencia este
+ * CorsConfigurationSource via http.cors().
  */
 @Configuration
 public class WebConfig {
@@ -18,15 +23,15 @@ public class WebConfig {
     private String allowedOrigins;
 
     @Bean
-    public WebMvcConfigurer corsConfigurer() {
-        return new WebMvcConfigurer() {
-            @Override
-            public void addCorsMappings(CorsRegistry registry) {
-                registry.addMapping("/api/**")
-                        .allowedOrigins(allowedOrigins.split(","))
-                        .allowedMethods("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
-                        .allowedHeaders("*");
-            }
-        };
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration config = new CorsConfiguration();
+        config.setAllowedOrigins(Arrays.asList(allowedOrigins.split(",")));
+        config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+        config.setAllowedHeaders(List.of("*"));
+        config.setAllowCredentials(true); // cookies de sessao + XSRF-TOKEN
+
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", config);
+        return source;
     }
 }

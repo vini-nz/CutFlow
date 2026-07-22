@@ -5,6 +5,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -21,6 +22,32 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(BusinessRuleException.class)
     public ResponseEntity<Map<String, Object>> handleBusinessRule(BusinessRuleException ex) {
         return buildResponse(HttpStatus.CONFLICT, ex.getMessage());
+    }
+
+    // ---- Autenticacao/autorizacao (ADR-0005) ----
+
+    @ExceptionHandler(BadCredentialsException.class)
+    public ResponseEntity<Map<String, Object>> handleBadCredentials(BadCredentialsException ex) {
+        return buildResponse(HttpStatus.UNAUTHORIZED, "E-mail ou senha inválidos");
+    }
+
+    @ExceptionHandler(NaoAutenticadoException.class)
+    public ResponseEntity<Map<String, Object>> handleNaoAutenticado(NaoAutenticadoException ex) {
+        return buildResponse(HttpStatus.UNAUTHORIZED, ex.getMessage());
+    }
+
+    @ExceptionHandler(AcessoNegadoException.class)
+    public ResponseEntity<Map<String, Object>> handleAcessoNegado(AcessoNegadoException ex) {
+        return buildResponse(HttpStatus.FORBIDDEN, ex.getMessage());
+    }
+
+    // Codigo proprio para o frontend distinguir "logado, mas sem organizacao"
+    // (leva ao onboarding) de um 409 de regra de negocio comum.
+    @ExceptionHandler(SemOrganizacaoException.class)
+    public ResponseEntity<Map<String, Object>> handleSemOrganizacao(SemOrganizacaoException ex) {
+        Map<String, Object> body = baseBody(HttpStatus.CONFLICT, ex.getMessage());
+        body.put("code", "SEM_ORGANIZACAO");
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
     }
 
     // Rede de seguranca, nao o fluxo principal: os pontos que podem violar uma
@@ -56,11 +83,15 @@ public class GlobalExceptionHandler {
     }
 
     private ResponseEntity<Map<String, Object>> buildResponse(HttpStatus status, String message) {
+        return ResponseEntity.status(status).body(baseBody(status, message));
+    }
+
+    private Map<String, Object> baseBody(HttpStatus status, String message) {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("status", status.value());
         body.put("error", status.getReasonPhrase());
         body.put("message", message);
         body.put("timestamp", OffsetDateTime.now().toString());
-        return ResponseEntity.status(status).body(body);
+        return body;
     }
 }
