@@ -1,8 +1,11 @@
 package com.cutflow.service;
 
+import com.cutflow.dto.auth.PerfilRequest;
 import com.cutflow.dto.auth.RegistroRequest;
+import com.cutflow.dto.auth.SenhaRequest;
 import com.cutflow.dto.auth.SessaoResponse;
 import com.cutflow.dto.auth.UsuarioResponse;
+import com.cutflow.exception.AcessoNegadoException;
 import com.cutflow.dto.organizacao.OrganizacaoResponse;
 import com.cutflow.entity.Membro;
 import com.cutflow.entity.Usuario;
@@ -69,6 +72,42 @@ public class AuthService {
         UUID ativa = organizacoes.isEmpty() ? null : organizacaoContexto.organizacaoAtiva().getUuid();
 
         return new SessaoResponse(UsuarioResponse.from(usuario), organizacoes, ativa);
+    }
+
+    /**
+     * Atualiza nome/e-mail do proprio usuario. Retorna o Usuario atualizado; o
+     * AuthController re-firma a sessao quando o e-mail muda (o principal da
+     * sessao carrega o e-mail antigo). E-mail deve continuar unico.
+     */
+    @Transactional
+    public Usuario atualizarPerfil(PerfilRequest request) {
+        Usuario usuario = organizacaoContexto.usuarioAtual();
+        String novoEmail = normalizarEmail(request.email());
+
+        if (!novoEmail.equalsIgnoreCase(usuario.getEmail()) && usuarioRepository.existsByEmail(novoEmail)) {
+            throw new BusinessRuleException("Já existe uma conta com esse e-mail");
+        }
+        usuario.setNome(request.nome().trim());
+        usuario.setEmail(novoEmail);
+        return usuarioRepository.save(usuario);
+    }
+
+    /**
+     * Troca a senha do proprio usuario. Se ja existe senha local, exige a atual
+     * correta; se e' conta so-Google (sem senha), define a primeira sem exigir
+     * a atual.
+     */
+    @Transactional
+    public void alterarSenha(SenhaRequest request) {
+        Usuario usuario = organizacaoContexto.usuarioAtual();
+
+        if (usuario.getSenhaHash() != null) {
+            if (request.senhaAtual() == null || !passwordEncoder.matches(request.senhaAtual(), usuario.getSenhaHash())) {
+                throw new AcessoNegadoException("Senha atual incorreta");
+            }
+        }
+        usuario.setSenhaHash(passwordEncoder.encode(request.novaSenha()));
+        usuarioRepository.save(usuario);
     }
 
     public static String normalizarEmail(String email) {

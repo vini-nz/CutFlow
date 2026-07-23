@@ -36,6 +36,12 @@ public class OrganizacaoController {
         return organizacaoService.criar(request);
     }
 
+    /** Edita nome/documento (OWNER/ADMIN). */
+    @PutMapping("/{uuid}")
+    public OrganizacaoResponse atualizar(@PathVariable UUID uuid, @Valid @RequestBody OrganizacaoRequest request) {
+        return organizacaoService.atualizar(uuid, request);
+    }
+
     /** Troca o workspace ativo da sessao. */
     @PostMapping("/{uuid}/ativar")
     public OrganizacaoResponse ativar(@PathVariable UUID uuid) {

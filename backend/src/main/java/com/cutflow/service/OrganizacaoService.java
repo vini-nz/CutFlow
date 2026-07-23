@@ -72,6 +72,17 @@ public class OrganizacaoService {
         return OrganizacaoResponse.from(organizacao, membro.getPapel());
     }
 
+    /** Edita nome/documento da organizacao - exige papel de gestao (OWNER/ADMIN). */
+    @Transactional
+    public OrganizacaoResponse atualizar(UUID organizacaoUuid, OrganizacaoRequest request) {
+        Membro gestor = organizacaoContexto.exigirGestaoDeMembrosDe(organizacaoUuid);
+        Organizacao organizacao = gestor.getOrganizacao();
+        organizacao.setNome(request.nome().trim());
+        organizacao.setDocumento(request.documento() != null && !request.documento().isBlank()
+                ? request.documento().trim() : null);
+        return OrganizacaoResponse.from(organizacaoRepository.save(organizacao), gestor.getPapel());
+    }
+
     @Transactional(readOnly = true)
     public List<MembroResponse> listarMembros(UUID organizacaoUuid) {
         Membro solicitante = organizacaoContexto.exigirMembroDe(organizacaoUuid);

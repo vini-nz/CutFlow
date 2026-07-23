@@ -1,9 +1,13 @@
 package com.cutflow.controller;
 
 import com.cutflow.dto.auth.LoginRequest;
+import com.cutflow.dto.auth.PerfilRequest;
 import com.cutflow.dto.auth.RegistroRequest;
+import com.cutflow.dto.auth.SenhaRequest;
 import com.cutflow.dto.auth.SessaoResponse;
 import com.cutflow.dto.auth.UsuarioResponse;
+import com.cutflow.entity.Usuario;
+import com.cutflow.security.UsuarioPrincipal;
 import com.cutflow.service.AuthService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -79,5 +83,31 @@ public class AuthController {
     @GetMapping("/me")
     public SessaoResponse me() {
         return authService.sessaoAtual();
+    }
+
+    /**
+     * Edita nome/e-mail do proprio usuario. Se o e-mail mudou, re-firma a
+     * sessao com o novo e-mail (o principal atual carrega o antigo, e sem isso
+     * a proxima requisicao cairia em 401).
+     */
+    @PutMapping("/perfil")
+    public SessaoResponse atualizarPerfil(@Valid @RequestBody PerfilRequest request,
+                                          HttpServletRequest httpRequest, HttpServletResponse httpResponse) {
+        Usuario atualizado = authService.atualizarPerfil(request);
+
+        SecurityContext context = SecurityContextHolder.createEmptyContext();
+        context.setAuthentication(new UsernamePasswordAuthenticationToken(
+                new UsuarioPrincipal(atualizado), null,
+                java.util.List.of(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_USER"))));
+        SecurityContextHolder.setContext(context);
+        securityContextRepository.saveContext(context, httpRequest, httpResponse);
+
+        return authService.sessaoAtual();
+    }
+
+    @PutMapping("/senha")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void alterarSenha(@Valid @RequestBody SenhaRequest request) {
+        authService.alterarSenha(request);
     }
 }
