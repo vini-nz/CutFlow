@@ -1,0 +1,81 @@
+# Stack de produção do CutFlow. Diferenças do docker-compose.yml (dev):
+#
+# - "seed.sql" NÃO é montado aqui: em dev ele cria uma conta de demonstração
+#   (demo@cutflow.app / demo1234) só para facilitar os testes - isso nunca
+#   pode existir num banco com dados reais de cliente.
+# - "db" e "backend" não publicam porta nenhuma para fora do host: só o
+#   serviço "edge" (Caddy) fica exposto à internet (80/443). Postgres aberto
+#   na internet é um erro de segurança comum - aqui ele só é alcançável pela
+#   rede interna do Docker, pelo próprio backend.
+# - "edge" substitui o frontend em modo dev: serve os arquivos JÁ compilados
+#   (build de produção) e faz o proxy para o backend, com HTTPS automático
+#   via Caddy (ver frontend/Dockerfile.prod e frontend/Caddyfile).
+#
+# Uso: docker compose -f docker-compose.prod.yml up -d --build
+# Guia completo (VM grátis, domínio grátis, backup): docs/deploy.md
+#
+# Variáveis obrigatórias no .env (exemplos completos em .env.example):
+#   DB_PASSWORD, CORS_ALLOWED_ORIGINS, FRONTEND_URL, DOMAIN
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: cutflow-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: "${DB_NAME:-cutflow}"
+      POSTGRES_USER: "${DB_USER:-cutflow}"
+      POSTGRES_PASSWORD: "${DB_PASSWORD:?defina DB_PASSWORD no .env}"
+    volumes:
+      - cutflow_pgdata:/var/lib/postgresql/data
+      - ./db/cutflow_ddl.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-cutflow} -d ${DB_NAME:-cutflow}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend
+    container_name: cutflow-backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: "${DB_NAME:-cutflow}"
+      DB_USER: "${DB_USER:-cutflow}"
+      DB_PASSWORD: "${DB_PASSWORD:?defina DB_PASSWORD no .env}"
+      CORS_ALLOWED_ORIGINS: "${CORS_ALLOWED_ORIGINS:?defina CORS_ALLOWED_ORIGINS no .env}"
+      FRONTEND_URL: "${FRONTEND_URL:?defina FRONTEND_URL no .env}"
+      SESSION_COOKIE_SECURE: "${SESSION_COOKIE_SECURE:-true}"
+      SESSION_COOKIE_SAMESITE: "${SESSION_COOKIE_SAMESITE:-lax}"
+      GOOGLE_CLIENT_ID: "${GOOGLE_CLIENT_ID:-}"
+      GOOGLE_CLIENT_SECRET: "${GOOGLE_CLIENT_SECRET:-}"
+
+  edge:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+    container_name: cutflow-edge
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      # Domínio real (ex: app.seudominio.com) para HTTPS automático, ou ":80"
+      # para testar em HTTP local sem certificado. Ver frontend/Caddyfile.
+      DOMAIN: "${DOMAIN:?defina DOMAIN no .env}"
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  cutflow_pgdata:
+  caddy_data:
+  caddy_config:

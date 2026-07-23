@@ -1,0 +1,19 @@
+# Build de produção do frontend: gera os arquivos estáticos otimizados
+# (npm run build) e os serve com Caddy, que também faz de reverse proxy para
+# o backend e HTTPS automático (Let's Encrypt) quando DOMAIN é um domínio
+# real publicamente acessível. Ver Caddyfile.
+#
+# Diferente do Dockerfile (dev, roda "vite dev" com hot-reload), esta imagem
+# não tem Node em runtime — só os arquivos já compilados + o binário do Caddy.
+# Mais leve, mais rápido e sem o overhead do dev server em produção.
+
+FROM node:20-alpine AS build
+WORKDIR /app
+COPY package.json package-lock.json* ./
+RUN npm install
+COPY . .
+RUN npm run build
+
+FROM caddy:2-alpine
+COPY --from=build /app/dist /srv
+COPY Caddyfile /etc/caddy/Caddyfile

@@ -1,0 +1,33 @@
+# Caddyfile de produção do CutFlow (ver frontend/Dockerfile.prod).
+#
+# {$DOMAIN} vem da variável de ambiente DOMAIN (definida no .env / no
+# docker-compose.prod.yml). Duas formas de usar:
+#
+#   DOMAIN=app.seudominio.com   -> Caddy provisiona HTTPS automático (Let's
+#                                   Encrypt) sozinho, sem nenhuma config extra.
+#                                   Exige que o domínio já aponte (DNS) para
+#                                   o IP público do servidor.
+#   DOMAIN=:80                  -> modo HTTP simples, sem TLS. Só para testar
+#                                   localmente antes de ir para o servidor real
+#                                   (ver docs/deploy.md).
+#
+{$DOMAIN}
+
+# API, login Google e callback do OAuth vão para o backend Spring Boot -
+# mesma origem que o frontend, exigido pelo login por sessão (ver ADR-0005).
+handle /api/* {
+	reverse_proxy backend:8080
+}
+handle /oauth2/* {
+	reverse_proxy backend:8080
+}
+handle /login/oauth2/* {
+	reverse_proxy backend:8080
+}
+
+# SPA: qualquer outra rota cai no index.html (React Router cuida do resto).
+handle {
+	root * /srv
+	try_files {path} /index.html
+	file_server
+}
