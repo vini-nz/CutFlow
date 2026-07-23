@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.5.0] — Espaço pessoal + compartilhamento de projeto
+
+Menos fricção e compartilhamento estilo Canva/Figma (ADR-0006):
+
+- **Espaço pessoal automático:** no cadastro (local ou Google) cria-se uma
+  organização pessoal em silêncio — o usuário cai direto em "criar projeto",
+  sem tela de "criar empresa". Organização de verdade (com equipe) vira opcional
+- **Compartilhamento direto de projeto**, sem organização: `ColaboradorProjeto`
+  (EDITOR/VISUALIZADOR) + `ConviteProjeto`. `email` no convite = convite pessoal
+  de uso único; sem e-mail = **link reutilizável** (vários usam até revogar).
+  Tela pública `/convite/:token` ("Fulano te convidou para o projeto X")
+- **"Compartilhados comigo"** na lista de projetos (à parte do workspace ativo)
+- **Autorização por acesso** (`ProjetoService.nivelAcesso`): Membro da
+  organização OU colaborador direto; VISUALIZADOR abre o projeto/plano em modo
+  somente-leitura (edição bloqueada no backend e escondida na UI)
+- Painel "Compartilhar" no projeto (gerar link, convidar por e-mail, listar
+  pessoas com acesso, revogar)
+- DDL + migração `0004_espaco_pessoal_e_compartilhamento.sql`
+- Correção de design vs. a proposta original: link reutilizável não é
+  "consumido" no primeiro aceite (só o convite por e-mail é de uso único)
+
 ## [0.4.0] — Contas, organizações (multi-tenant) e equipe
 
 Preparação para deploy (ADR-0005):

@@ -50,11 +50,30 @@ Papéis: `OWNER`, `ADMIN`, `MEMBRO`. `403` quando falta permissão.
 
 | Método | Rota | Descrição |
 |---|---|---|
-| `GET` | `/projetos?page=0&size=20` | Lista projetos, paginado, mais recentes primeiro |
-| `GET` | `/projetos/{uuid}` | Detalhe de um projeto |
-| `POST` | `/projetos` | Cria projeto — `{ nome, cliente }` |
-| `PUT` | `/projetos/{uuid}` | Atualiza projeto |
-| `DELETE` | `/projetos/{uuid}` | Remove projeto (cascata: chapas, peças e planos junto) |
+| `GET` | `/projetos?page=0&size=20` | Lista projetos da organização ativa, paginado |
+| `GET` | `/projetos/compartilhados` | Projetos compartilhados diretamente comigo (ADR-0006), com `podeEditar` |
+| `GET` | `/projetos/{uuid}` | Detalhe de um projeto (inclui `podeEditar`) |
+| `POST` | `/projetos` | Cria projeto na organização ativa — `{ nome, cliente }` |
+| `PUT` | `/projetos/{uuid}` | Atualiza projeto (exige edição) |
+| `DELETE` | `/projetos/{uuid}` | Remove projeto (exige edição; cascata: chapas, peças, planos, colaboradores) |
+
+`podeEditar` = o usuário pode editar (Membro da organização ou colaborador
+EDITOR) ou só visualizar (colaborador VISUALIZADOR). Mutar sem edição = `403`.
+
+## Compartilhamento de projeto (ADR-0006)
+
+Gestão exige acesso de **edição** ao projeto. `email` vazio no convite gera um
+**link reutilizável**; preenchido gera um **convite de uso único** para o e-mail.
+
+| Método | Rota | Descrição |
+|---|---|---|
+| `GET` | `/projetos/{projetoUuid}/colaboradores` | Pessoas com acesso direto |
+| `DELETE` | `/projetos/{projetoUuid}/colaboradores/{uuid}` | Remove um colaborador |
+| `GET` | `/projetos/{projetoUuid}/convites` | Convites/links ativos (com `urlConvite`) |
+| `POST` | `/projetos/{projetoUuid}/convites` | Cria convite/link — `{ email?, papel }` (`EDITOR`/`VISUALIZADOR`) |
+| `DELETE` | `/projetos/{projetoUuid}/convites/{uuid}` | Revoga um convite/link |
+| `GET` | `/convites/{token}` | **Público** — detalhes do convite ("Fulano te convidou...") |
+| `POST` | `/convites/{token}/aceitar` | Aceita (exige login); retorna `{ projetoUuid }` |
 
 ## Chapas
 
