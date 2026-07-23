@@ -11,6 +11,7 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.ProviderManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
@@ -91,6 +92,10 @@ public class SecurityConfig {
                                 "/api/v1/auth/config").permitAll()
                         .requestMatchers("/oauth2/**", "/login/**").permitAll()
                         .requestMatchers("/actuator/health").permitAll()
+                        // Detalhes de um convite sao publicos (ADR-0006): mostram
+                        // "Fulano te convidou..." antes do login. So o GET; o
+                        // POST /aceitar tem um segmento a mais e continua exigindo sessao.
+                        .requestMatchers(HttpMethod.GET, "/api/v1/convites/*").permitAll()
                         .anyRequest().authenticated())
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint((request, response, authException) ->

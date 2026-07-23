@@ -61,6 +61,7 @@ public class ChapaService {
     @Transactional
     public ChapaResponse update(UUID projetoUuid, UUID chapaUuid, ChapaRequest request) {
         Projeto projeto = projetoService.findOrThrow(projetoUuid);
+        projetoService.exigirPodeEditar(projeto);
         Chapa chapa = findOrThrow(projeto.getId(), chapaUuid);
 
         chapa.setLarguraMm(request.larguraMm());
@@ -85,6 +86,7 @@ public class ChapaService {
     @Transactional
     public void delete(UUID projetoUuid, UUID chapaUuid) {
         Projeto projeto = projetoService.findOrThrow(projetoUuid);
+        projetoService.exigirPodeEditar(projeto);
         Chapa chapa = findOrThrow(projeto.getId(), chapaUuid);
 
         boolean temPecasDaCombinacao = pecaRepository.existsByProjetoIdAndEspessuraMmAndTipoAcabamento(

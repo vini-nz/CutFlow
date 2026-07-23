@@ -69,6 +69,7 @@ public class PlanoDeCorteService {
     @Transactional
     public PlanoDeCorteResponse gerar(UUID projetoUuid) {
         Projeto projeto = projetoService.findOrThrow(projetoUuid);
+        projetoService.exigirPodeEditar(projeto);
         List<Peca> pecas = pecaRepository.findByProjetoIdOrderByCreatedAtAsc(projeto.getId());
         if (pecas.isEmpty()) {
             throw new BusinessRuleException("Projeto não tem peças cadastradas");

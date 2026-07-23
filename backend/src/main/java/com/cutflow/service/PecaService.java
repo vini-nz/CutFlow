@@ -45,6 +45,7 @@ public class PecaService {
     @Transactional
     public PecaResponse create(UUID projetoUuid, PecaRequest request) {
         Projeto projeto = projetoService.findOrThrow(projetoUuid);
+        projetoService.exigirPodeEditar(projeto);
         chapaService.garantirChapa(projeto.getId(), projeto, request.espessuraMm(), request.tipoAcabamento());
 
         Peca peca = new Peca();
@@ -57,6 +58,7 @@ public class PecaService {
     @Transactional
     public PecaResponse update(UUID projetoUuid, UUID pecaUuid, PecaRequest request) {
         Projeto projeto = projetoService.findOrThrow(projetoUuid);
+        projetoService.exigirPodeEditar(projeto);
         Peca peca = findOrThrow(projeto.getId(), pecaUuid);
         chapaService.garantirChapa(projeto.getId(), projeto, request.espessuraMm(), request.tipoAcabamento());
         aplicarRequest(peca, request);
@@ -67,6 +69,7 @@ public class PecaService {
     @Transactional
     public void delete(UUID projetoUuid, UUID pecaUuid) {
         Projeto projeto = projetoService.findOrThrow(projetoUuid);
+        projetoService.exigirPodeEditar(projeto);
         Peca peca = findOrThrow(projeto.getId(), pecaUuid);
         // A invalidacao precisa vir ANTES da delecao: posicionamentos de
         // planos antigos referenciam a peca e bloqueariam o DELETE.

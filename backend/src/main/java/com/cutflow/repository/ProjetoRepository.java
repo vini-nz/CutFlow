@@ -9,9 +9,13 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface ProjetoRepository extends JpaRepository<Projeto, Long> {
-    // Todas as buscas sao escopadas pela organizacao ativa (ADR-0005): nunca
-    // ha lookup so por uuid, para um usuario nunca alcancar projeto de outra
-    // organizacao adivinhando/vendo a URL.
-    Optional<Projeto> findByUuidAndOrganizacaoId(UUID uuid, Long organizacaoId);
+
+    // Desde a ADR-0006, um projeto pode ser acessado por Membro da sua
+    // organizacao OU por ColaboradorProjeto direto (fora da organizacao) - por
+    // isso a busca por uuid nao filtra mais por organizacao aqui; quem autoriza
+    // e' ProjetoService.nivelAcesso, olhando os dois caminhos.
+    Optional<Projeto> findByUuid(UUID uuid);
+
+    // Lista "Meus projetos" continua escopada pela organizacao ativa (workspace).
     Page<Projeto> findByOrganizacaoIdOrderByCreatedAtDesc(Long organizacaoId, Pageable pageable);
 }

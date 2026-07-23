@@ -12,6 +12,7 @@ import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -25,6 +26,12 @@ public class ProjetoController {
     public Page<ProjetoResponse> list(
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
         return projetoService.list(pageable);
+    }
+
+    /** Projetos compartilhados diretamente comigo (ADR-0006), fora do workspace ativo. */
+    @GetMapping("/compartilhados")
+    public List<ProjetoResponse> compartilhadosComigo() {
+        return projetoService.listCompartilhadosComigo();
     }
 
     @GetMapping("/{uuid}")

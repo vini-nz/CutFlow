@@ -45,6 +45,8 @@ CREATE TABLE organizacoes (
     id            BIGSERIAL PRIMARY KEY,
     uuid          UUID NOT NULL UNIQUE DEFAULT gen_random_uuid(),
     nome          VARCHAR(150) NOT NULL,
+    -- Espaco pessoal (criado no cadastro) x organizacao de verdade (ADR-0006).
+    pessoal       BOOLEAN NOT NULL DEFAULT FALSE,
     documento     VARCHAR(30),          -- CNPJ opcional; nao e chave de login
     created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -92,6 +94,56 @@ CREATE INDEX idx_projetos_organizacao_id ON projetos(organizacao_id);
 
 CREATE TRIGGER trg_projetos_updated_at
     BEFORE UPDATE ON projetos
+    FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+-- ----------------------------------------------------------------------------
+-- Compartilhamento direto de projeto (ADR-0006): acesso a UM projeto sem
+-- passar por organizacao - o caminho "Joaquim compartilha o plano com o
+-- Carlos". Colaborador so enxerga o projeto compartilhado, nada mais da
+-- organizacao dona.
+-- ----------------------------------------------------------------------------
+
+CREATE TABLE colaboradores_projeto (
+    id            BIGSERIAL PRIMARY KEY,
+    uuid          UUID NOT NULL UNIQUE DEFAULT gen_random_uuid(),
+    projeto_id    BIGINT NOT NULL REFERENCES projetos(id) ON DELETE CASCADE,
+    usuario_id    BIGINT NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+    papel         VARCHAR(20) NOT NULL DEFAULT 'VISUALIZADOR'
+                  CHECK (papel IN ('EDITOR', 'VISUALIZADOR')),
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE UNIQUE INDEX uq_colaboradores_projeto_usuario ON colaboradores_projeto(projeto_id, usuario_id);
+CREATE INDEX idx_colaboradores_projeto_projeto_id ON colaboradores_projeto(projeto_id);
+CREATE INDEX idx_colaboradores_projeto_usuario_id ON colaboradores_projeto(usuario_id);
+
+CREATE TRIGGER trg_colaboradores_projeto_updated_at
+    BEFORE UPDATE ON colaboradores_projeto
+    FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+-- Convite/link de compartilhamento. email_alvo NULL = link reutilizavel
+-- (varios aceitam, vale ate revogar); preenchido = convite de uso unico para
+-- aquele e-mail (marca aceito_em ao aceitar). O uuid e' o token da URL.
+CREATE TABLE convites_projeto (
+    id             BIGSERIAL PRIMARY KEY,
+    uuid           UUID NOT NULL UNIQUE DEFAULT gen_random_uuid(),
+    projeto_id     BIGINT NOT NULL REFERENCES projetos(id) ON DELETE CASCADE,
+    papel          VARCHAR(20) NOT NULL DEFAULT 'VISUALIZADOR'
+                   CHECK (papel IN ('EDITOR', 'VISUALIZADOR')),
+    email_alvo     VARCHAR(180),
+    criado_por_id  BIGINT NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+    aceito_por_id  BIGINT REFERENCES usuarios(id) ON DELETE SET NULL,
+    aceito_em      TIMESTAMPTZ,
+    revogado       BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_convites_projeto_projeto_id ON convites_projeto(projeto_id);
+
+CREATE TRIGGER trg_convites_projeto_updated_at
+    BEFORE UPDATE ON convites_projeto
     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 -- ============================================================================
