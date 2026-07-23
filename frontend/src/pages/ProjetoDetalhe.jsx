@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import api from '../services/api.js'
 import CanvasChapa from '../components/CanvasChapa.jsx'
+import PainelCompartilhar from '../components/PainelCompartilhar.jsx'
 
 const ESPESSURAS = [6, 15, 18, 25]
 
@@ -51,6 +52,7 @@ export default function ProjetoDetalhe() {
   const [gerandoAuto, setGerandoAuto] = useState(false)
   const [exportando, setExportando] = useState(false)
   const [chapaSelecionada, setChapaSelecionada] = useState(0)
+  const [showCompartilhar, setShowCompartilhar] = useState(false)
 
   // Regeneracao automatica ("tempo real"): cada mutacao bem-sucedida de
   // peca/chapa incrementa o tick; o efeito com debounce dispara a geracao.
@@ -288,13 +290,37 @@ export default function ProjetoDetalhe() {
   }
 
   const chapaDoPlano = plano?.chapas[chapaSelecionada]
+  // Colaborador VISUALIZADOR (ADR-0006): projeto abre normalmente, mas sem
+  // controles de edição. O backend recusa qualquer mutação (403) de qualquer forma.
+  const somenteLeitura = projeto.podeEditar === false
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <header className="border-b border-gray-200 bg-white px-6 py-4">
-        <Link to="/" className="text-sm text-gray-500 hover:text-cutflow-700">← Projetos</Link>
-        <h1 className="mt-1 text-lg font-medium text-cutflow-900">{projeto.nome}</h1>
-        {projeto.cliente && <p className="text-sm text-gray-500">Cliente: {projeto.cliente}</p>}
+      {showCompartilhar && (
+        <PainelCompartilhar projetoUuid={uuid} onClose={() => setShowCompartilhar(false)} />
+      )}
+
+      <header className="flex flex-wrap items-start justify-between gap-3 border-b border-gray-200 bg-white px-6 py-4">
+        <div>
+          <Link to="/" className="text-sm text-gray-500 hover:text-cutflow-700">← Projetos</Link>
+          <h1 className="mt-1 text-lg font-medium text-cutflow-900">{projeto.nome}</h1>
+          {projeto.cliente && <p className="text-sm text-gray-500">Cliente: {projeto.cliente}</p>}
+        </div>
+        <div className="flex items-center gap-2">
+          {somenteLeitura && (
+            <span className="rounded bg-gray-100 px-2 py-1 text-xs font-medium text-gray-600">
+              Somente visualização
+            </span>
+          )}
+          {!somenteLeitura && (
+            <button
+              onClick={() => setShowCompartilhar(true)}
+              className="rounded border border-cutflow-600 px-3 py-1.5 text-sm font-medium text-cutflow-700 hover:bg-cutflow-50"
+            >
+              Compartilhar
+            </button>
+          )}
+        </div>
       </header>
 
       {/* Resumo ao vivo - atualiza sozinho conforme peças são adicionadas/removidas */}
@@ -408,14 +434,16 @@ export default function ProjetoDetalhe() {
                         {chapa.material} · kerf {chapa.kerfMm}mm · margem {chapa.margemBordaMm}mm
                       </p>
                     </div>
-                    <div className="flex shrink-0 gap-3">
-                      <button onClick={() => abrirEdicaoChapa(chapa)} className="text-xs text-cutflow-700 hover:underline">
-                        Editar
-                      </button>
-                      <button onClick={() => handleDeleteChapa(chapa)} className="text-xs text-red-600 hover:underline">
-                        Excluir
-                      </button>
-                    </div>
+                    {!somenteLeitura && (
+                      <div className="flex shrink-0 gap-3">
+                        <button onClick={() => abrirEdicaoChapa(chapa)} className="text-xs text-cutflow-700 hover:underline">
+                          Editar
+                        </button>
+                        <button onClick={() => handleDeleteChapa(chapa)} className="text-xs text-red-600 hover:underline">
+                          Excluir
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -427,12 +455,14 @@ export default function ProjetoDetalhe() {
         <section className="lg:col-span-1">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-base font-medium text-gray-900">Peças</h2>
-            <button
-              onClick={() => (showPecaForm ? setShowPecaForm(false) : abrirNovaPeca())}
-              className="rounded bg-cutflow-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-cutflow-700"
-            >
-              + Peça
-            </button>
+            {!somenteLeitura && (
+              <button
+                onClick={() => (showPecaForm ? setShowPecaForm(false) : abrirNovaPeca())}
+                className="rounded bg-cutflow-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-cutflow-700"
+              >
+                + Peça
+              </button>
+            )}
           </div>
 
           {showPecaForm && (
@@ -530,11 +560,13 @@ export default function ProjetoDetalhe() {
                     <td className="px-3 py-2 text-gray-600">{peca.larguraMm}x{peca.alturaMm}mm, {peca.espessuraMm}mm</td>
                     <td className="px-3 py-2 text-gray-600">{peca.quantidade}</td>
                     <td className="px-3 py-2 text-right">
-                      <div className="flex justify-end gap-2 whitespace-nowrap">
-                        <button onClick={() => abrirEdicaoPeca(peca)} className="text-xs text-cutflow-700 hover:underline">Editar</button>
-                        <button onClick={() => duplicarPeca(peca)} className="text-xs text-gray-500 hover:underline">Duplicar</button>
-                        <button onClick={() => handleDeletePeca(peca)} className="text-xs text-red-600 hover:underline">Remover</button>
-                      </div>
+                      {!somenteLeitura && (
+                        <div className="flex justify-end gap-2 whitespace-nowrap">
+                          <button onClick={() => abrirEdicaoPeca(peca)} className="text-xs text-cutflow-700 hover:underline">Editar</button>
+                          <button onClick={() => duplicarPeca(peca)} className="text-xs text-gray-500 hover:underline">Duplicar</button>
+                          <button onClick={() => handleDeletePeca(peca)} className="text-xs text-red-600 hover:underline">Remover</button>
+                        </div>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -542,16 +574,20 @@ export default function ProjetoDetalhe() {
             </table>
           </div>
 
-          <button
-            onClick={() => gerarPlano()}
-            disabled={gerando || pecas.length === 0}
-            className="mt-4 w-full rounded bg-cutflow-700 px-4 py-3 text-sm font-semibold text-white hover:bg-cutflow-900 disabled:opacity-50"
-          >
-            {gerando ? 'Gerando plano...' : 'Gerar plano de corte'}
-          </button>
-          <p className="mt-1 text-center text-[11px] text-gray-400">
-            O plano é recalculado sozinho a cada alteração — o botão força uma nova geração.
-          </p>
+          {!somenteLeitura && (
+            <>
+              <button
+                onClick={() => gerarPlano()}
+                disabled={gerando || pecas.length === 0}
+                className="mt-4 w-full rounded bg-cutflow-700 px-4 py-3 text-sm font-semibold text-white hover:bg-cutflow-900 disabled:opacity-50"
+              >
+                {gerando ? 'Gerando plano...' : 'Gerar plano de corte'}
+              </button>
+              <p className="mt-1 text-center text-[11px] text-gray-400">
+                O plano é recalculado sozinho a cada alteração — o botão força uma nova geração.
+              </p>
+            </>
+          )}
           {planoError && <p className="mt-2 rounded bg-red-50 px-3 py-2 text-sm text-red-700">{planoError}</p>}
         </section>
 

@@ -12,7 +12,9 @@ export default function AppHeader() {
   if (!sessao) return null
 
   const ativa = sessao.organizacoes.find((o) => o.uuid === sessao.organizacaoAtivaUuid)
-  const podeGerenciar = ativa && (ativa.papel === 'OWNER' || ativa.papel === 'ADMIN')
+  // Gestão de equipe só faz sentido numa organização de verdade — o espaço
+  // pessoal (ADR-0006) é de uma pessoa só, então esconde o atalho "Equipe".
+  const podeGerenciar = ativa && !ativa.pessoal && (ativa.papel === 'OWNER' || ativa.papel === 'ADMIN')
 
   async function handleTroca(e) {
     const uuid = e.target.value

@@ -12,7 +12,10 @@ export default function Login() {
   const [erro, setErro] = useState(searchParams.get('erro') === 'google' ? 'Não foi possível entrar com o Google.' : '')
   const [enviando, setEnviando] = useState(false)
 
-  if (!carregando && sessao) return <Navigate to="/" replace />
+  // Volta para onde o usuário estava (ex: /convite/:token), padrão a home.
+  const proximo = searchParams.get('next') || '/'
+
+  if (!carregando && sessao) return <Navigate to={proximo} replace />
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -20,7 +23,7 @@ export default function Login() {
     setErro('')
     try {
       await login(email, senha)
-      navigate('/')
+      navigate(proximo)
     } catch (err) {
       setErro(err.response?.data?.message || 'Não foi possível entrar.')
     } finally {
@@ -75,7 +78,12 @@ export default function Login() {
 
         <p className="mt-6 text-center text-sm text-gray-500">
           Não tem conta?{' '}
-          <Link to="/registro" className="font-medium text-cutflow-700 hover:underline">Criar conta</Link>
+          <Link
+            to={proximo !== '/' ? `/registro?next=${encodeURIComponent(proximo)}` : '/registro'}
+            className="font-medium text-cutflow-700 hover:underline"
+          >
+            Criar conta
+          </Link>
         </p>
       </div>
     </div>

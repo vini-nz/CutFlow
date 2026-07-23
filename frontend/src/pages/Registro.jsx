@@ -1,16 +1,20 @@
 import { useState } from 'react'
-import { Link, Navigate, useNavigate } from 'react-router-dom'
+import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { useSession } from '../context/SessionContext.jsx'
 
 export default function Registro() {
   const { sessao, carregando, registrar, googleHabilitado } = useSession()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
 
   const [form, setForm] = useState({ nome: '', email: '', senha: '' })
   const [erro, setErro] = useState('')
   const [enviando, setEnviando] = useState(false)
 
-  if (!carregando && sessao) return <Navigate to="/" replace />
+  // Volta para onde o usuário estava (ex: /convite/:token), padrão a home.
+  const proximo = searchParams.get('next') || '/'
+
+  if (!carregando && sessao) return <Navigate to={proximo} replace />
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -18,7 +22,7 @@ export default function Registro() {
     setErro('')
     try {
       await registrar(form.nome, form.email, form.senha)
-      navigate('/') // ProtectedLayout leva ao onboarding se ainda não há organização
+      navigate(proximo)
     } catch (err) {
       setErro(err.response?.data?.message || 'Não foi possível criar a conta.')
     } finally {
@@ -79,7 +83,12 @@ export default function Registro() {
 
         <p className="mt-6 text-center text-sm text-gray-500">
           Já tem conta?{' '}
-          <Link to="/login" className="font-medium text-cutflow-700 hover:underline">Entrar</Link>
+          <Link
+            to={proximo !== '/' ? `/login?next=${encodeURIComponent(proximo)}` : '/login'}
+            className="font-medium text-cutflow-700 hover:underline"
+          >
+            Entrar
+          </Link>
         </p>
       </div>
     </div>

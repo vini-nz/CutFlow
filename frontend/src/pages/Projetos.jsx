@@ -10,6 +10,7 @@ export default function Projetos() {
   const orgAtiva = sessao?.organizacaoAtivaUuid
 
   const [projetos, setProjetos] = useState([])
+  const [compartilhados, setCompartilhados] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -26,9 +27,17 @@ export default function Projetos() {
       .finally(() => setLoading(false))
   }
 
+  function loadCompartilhados() {
+    // Independe do workspace ativo (ADR-0006): projetos que outros me passaram.
+    api.get('/projetos/compartilhados')
+      .then((response) => setCompartilhados(response.data))
+      .catch(() => setCompartilhados([]))
+  }
+
   // Recarrega ao trocar de workspace (organização ativa).
   useEffect(() => {
     loadProjetos()
+    loadCompartilhados()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orgAtiva])
 
@@ -154,6 +163,44 @@ export default function Projetos() {
           </tbody>
         </table>
       </div>
+
+      {/* Compartilhados comigo (ADR-0006): projetos de outras pessoas/organizações */}
+      {compartilhados.length > 0 && (
+        <div className="mt-8">
+          <h2 className="mb-1 text-base font-medium text-gray-900">Compartilhados comigo</h2>
+          <p className="mb-3 text-sm text-gray-500">Projetos que alguém compartilhou diretamente com você.</p>
+          <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 text-left text-gray-500">
+                <tr>
+                  <th className="px-4 py-3 font-medium">Projeto</th>
+                  <th className="px-4 py-3 font-medium">Cliente</th>
+                  <th className="px-4 py-3 font-medium">Acesso</th>
+                </tr>
+              </thead>
+              <tbody>
+                {compartilhados.map((projeto) => (
+                  <tr key={projeto.uuid} className="border-t border-gray-100">
+                    <td className="px-4 py-3">
+                      <Link to={`/projetos/${projeto.uuid}`} className="font-medium text-cutflow-700 hover:underline">
+                        {projeto.nome}
+                      </Link>
+                    </td>
+                    <td className="px-4 py-3 text-gray-600">{projeto.cliente || '—'}</td>
+                    <td className="px-4 py-3">
+                      <span className={`rounded px-1.5 py-0.5 text-[11px] font-medium ${
+                        projeto.podeEditar ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'
+                      }`}>
+                        {projeto.podeEditar ? 'editor' : 'somente leitura'}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </main>
   )
 }
