@@ -2,6 +2,7 @@ package com.cutflow.security;
 
 import com.cutflow.entity.Usuario;
 import com.cutflow.repository.UsuarioRepository;
+import com.cutflow.service.EspacoPessoalService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserRequest;
 import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserService;
@@ -16,16 +17,15 @@ import org.springframework.transaction.annotation.Transactional;
  * - ja existe conta com esse googleSub -> usa ela;
  * - existe conta com o mesmo e-mail (cadastro local previo) -> vincula o
  *   googleSub a ela (mesma pessoa, um unico login);
- * - nao existe -> cria uma conta nova sem senha (so Google).
- *
- * Nao cria organizacao aqui: quem entra pela primeira vez cai no onboarding de
- * organizacao no frontend, igual ao cadastro local.
+ * - nao existe -> cria uma conta nova sem senha (so Google) + espaco pessoal
+ *   automatico (ADR-0006), igual ao cadastro local.
  */
 @Service
 @RequiredArgsConstructor
 public class CutflowOidcUserService extends OidcUserService {
 
     private final UsuarioRepository usuarioRepository;
+    private final EspacoPessoalService espacoPessoalService;
 
     @Override
     @Transactional
@@ -45,14 +45,19 @@ public class CutflowOidcUserService extends OidcUserService {
                 .or(() -> usuarioRepository.findByEmail(email))
                 .orElseGet(Usuario::new);
 
-        if (usuario.getId() == null) {
+        boolean contaNova = usuario.getId() == null;
+        if (contaNova) {
             usuario.setEmail(email);
             usuario.setNome(nome);
         }
         if (usuario.getGoogleSub() == null) {
             usuario.setGoogleSub(sub);
         }
-        usuarioRepository.save(usuario);
+        usuario = usuarioRepository.save(usuario);
+
+        if (contaNova) {
+            espacoPessoalService.criarPara(usuario);
+        }
 
         return oidcUser;
     }

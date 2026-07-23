@@ -31,6 +31,7 @@ public class AuthService {
     private final MembroRepository membroRepository;
     private final PasswordEncoder passwordEncoder;
     private final OrganizacaoContexto organizacaoContexto;
+    private final EspacoPessoalService espacoPessoalService;
 
     @Transactional
     public UsuarioResponse registrar(RegistroRequest request) {
@@ -42,7 +43,13 @@ public class AuthService {
         usuario.setNome(request.nome().trim());
         usuario.setEmail(email);
         usuario.setSenhaHash(passwordEncoder.encode(request.senha()));
-        return UsuarioResponse.from(usuarioRepository.save(usuario));
+        usuario = usuarioRepository.save(usuario);
+
+        // Espaco pessoal automatico (ADR-0006): o usuario ja cai em "criar
+        // projeto", sem nunca ver uma tela de "criar organizacao".
+        espacoPessoalService.criarPara(usuario);
+
+        return UsuarioResponse.from(usuario);
     }
 
     /**
