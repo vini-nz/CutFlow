@@ -1,96 +1,359 @@
-# Publicação em produção
+# Publicação em produção — guia passo a passo
 
-Este guia cobre o que muda ao sair do `docker compose` local para um ambiente
-real, e a recomendação de hospedagem.
+Este guia assume que você nunca hospedou nada antes. Ao final, o CutFlow
+estará no ar, com HTTPS, num link fixo, **sem pagar nada por mês** — só o
+domínio é opcional (existe uma alternativa 100% grátis, explicada abaixo).
 
-## Princípio: frontend e backend na MESMA origem
+Tempo estimado: 45–60 minutos na primeira vez, feito uma única vez.
 
-O login é por **sessão** (cookie httpOnly). Para o cookie ser first-party e o
-CSRF funcionar sem dor, a SPA e a API devem responder no **mesmo domínio**
-(ex.: `https://app.suamarcenaria.com.br` serve a SPA e faz proxy de `/api`,
-`/oauth2` e `/login/oauth2` para o backend). Um reverse proxy (Caddy, Nginx ou
-Traefik) resolve isso. Evite frontend e backend em domínios diferentes — exige
-`SameSite=None` + HTTPS e complica CSRF/CORS sem ganho real aqui.
+## Como funciona (resumo antes de começar)
 
-## Checklist de segurança pré-deploy
+O CutFlow roda em 3 partes (Postgres, backend Java, frontend), empacotadas em
+containers Docker que já testamos localmente. Vamos colocá-las para rodar
+**de graça, para sempre** — não é um teste grátis por 30 dias — numa
+máquina virtual da Oracle Cloud ("Always Free"), com um endereço público
+(domínio) e certificado HTTPS automático.
 
-- [ ] **HTTPS obrigatório** (a maioria dos hosts entrega de graça; com Caddy é
-      automático). Depois, `SESSION_COOKIE_SECURE=true`.
-- [ ] **Segredos só em variáveis de ambiente do host** — `DB_PASSWORD`,
-      `GOOGLE_CLIENT_SECRET`. Nunca no `.env` commitado (já está no
-      `.gitignore`).
-- [ ] **Trocar a conta demo/migração** (`demo@cutflow.app` /
-      `admin@cutflow.local`, senha `demo1234`): crie sua conta real e remova/
-      altere as de exemplo.
-- [ ] `CORS_ALLOWED_ORIGINS` e `FRONTEND_URL` = domínio real (não localhost).
-- [ ] **Backup automático do Postgres** (ver o que o host oferece).
-- [ ] Rodar a migração `db/migrations/0003_multi_tenant_auth.sql` se o banco já
-      existir (senão o schema novo do DDL cobre uma base zerada).
+Por que Oracle e não Render/Railway (que também têm "grátis")? Porque nos
+dois o **banco de dados grátis expira ou o serviço dorme** — inviável para
+guardar projetos reais de um cliente. A VM da Oracle não expira, não dorme e
+não tem pegadinha: é gratuita enquanto você não passar dos limites (bem
+folgados para o nosso caso).
 
-## Variáveis de ambiente (produção)
+---
 
-| Variável | Exemplo |
-|---|---|
-| `DB_NAME`, `DB_USER`, `DB_PASSWORD` | credenciais do Postgres gerenciado |
-| `CORS_ALLOWED_ORIGINS` | `https://app.suamarcenaria.com.br` |
-| `FRONTEND_URL` | `https://app.suamarcenaria.com.br` |
-| `SESSION_COOKIE_SECURE` | `true` |
-| `SESSION_COOKIE_SAMESITE` | `lax` (mesma origem) |
-| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | credenciais OAuth (opcional) |
+## Parte 1 — Criar a máquina virtual gratuita (Oracle Cloud)
 
-### Login Google (opcional)
+### 1.1. Criar a conta
 
-No [Google Cloud Console](https://console.cloud.google.com/), crie um OAuth 2.0
-Client ID (Web application) e cadastre o **Authorized redirect URI**:
+1. Acesse **https://www.oracle.com/cloud/free/** e clique em "Start for free".
+2. Preencha e-mail, país e crie uma senha.
+3. A Oracle pede um **cartão de crédito para verificar sua identidade** —
+   isso é normal e **não gera cobrança** enquanto você usar só os recursos
+   "Always Free" (os que vamos usar). Nenhuma assinatura é iniciada.
+4. Escolha uma região próxima de você (ex.: `Brazil East (São Paulo)` ou
+   `Brazil Southeast (Vinhedo)`, se disponíveis) — depois de criada, a
+   região **não muda mais**, então escolha com calma.
+5. Confirme o e-mail e finalize o cadastro.
 
-- Dev: `http://localhost:5173/login/oauth2/code/google`
-- Prod: `https://app.suamarcenaria.com.br/login/oauth2/code/google`
+### 1.2. Criar a VM (a "máquina" onde o CutFlow vai rodar)
 
-## Recomendação de hospedagem
+1. No menu (☰, canto superior esquerdo) → **Compute → Instances → Create
+   instance**.
+2. Nome: `cutflow-server` (ou o que preferir).
+3. Em **Image and shape**, clique em "Edit":
+   - Imagem: **Canonical Ubuntu** (24.04 ou mais recente).
+   - Shape: clique em "Change shape" → aba **Ampere** → escolha
+     `VM.Standard.A1.Flex` → configure **2 OCPU / 12 GB de memória**
+     (o teto do plano gratuito) → confirme. Certifique-se de que diz
+     **"Always Free-eligible"** na tela.
+4. Em **Add SSH keys**, deixe a Oracle **gerar** o par de chaves e clique em
+   "Save private key" — salve o arquivo (algo como `ssh-key-...key`) num
+   lugar que você vai lembrar (ex.: `Documentos\chaves\`). É a "senha" que
+   você vai usar para entrar na VM depois; sem ele, você perde o acesso.
+5. Clique em **Create**.
 
-O CutFlow são três peças: **Postgres**, **backend Spring Boot** e **frontend**.
-Duas rotas fazem sentido para o estágio atual (uma marcenaria, uso real):
+**Se aparecer erro "Out of host capacity"**: é só falta de vaga temporária
+para máquinas ARM gratuitas na sua região — muito comum, não é erro seu.
+Tente de novo em alguns minutos, ou troque o "Availability domain" (AD-1,
+AD-2, AD-3, se sua região tiver mais de um) e tente de novo. Costuma
+funcionar em poucas tentativas.
 
-### Opção A — VPS pequeno com o docker-compose (recomendada para custo/controle)
+### 1.3. Abrir as portas 80 e 443 (para o site ficar acessível)
 
-Um servidor pequeno (ex.: **Hetzner CX22 ~€4/mês**, DigitalOcean/Contabo
-equivalentes) rodando o `docker-compose` que você **já tem funcionando**, com
-**Caddy** na frente para HTTPS automático e para servir a SPA + proxy da API na
-mesma origem.
+Por padrão a Oracle só libera a porta 22 (acesso remoto). Precisamos abrir
+80 (HTTP) e 443 (HTTPS):
 
-- **Prós:** mais barato, sempre ligado (sem "cold start"), você já domina o
-  docker-compose, tudo num lugar só.
-- **Contras:** você administra o servidor (atualizações do SO, backup do
-  Postgres — configure um `pg_dump` agendado ou snapshot do provedor).
-- É o passo mais natural a partir de onde o projeto está hoje.
+1. Na página da instância criada, clique no link da **VCN** (a rede) →
+   clique na **Security List** padrão (`Default Security List for ...`).
+2. **Add Ingress Rules** → adicione uma regra:
+   - Source CIDR: `0.0.0.0/0`
+   - IP Protocol: TCP
+   - Destination Port Range: `80`
+3. Repita para a porta `443`.
 
-### Opção B — Plataforma gerenciada (recomendada para zero-ops)
+### 1.4. Anotar o IP público
 
-**Railway** ou **Render**: conectam ao seu repositório GitHub (que já existe),
-sobem backend + Postgres gerenciado + frontend, com HTTPS e deploy automático a
-cada push.
+Na página da instância, copie o **Public IP Address** (algo como
+`123.45.67.89`) — vamos precisar dele já já.
 
-- **Prós:** quase nada de administração; Postgres gerenciado com backup;
-  bom para focar no produto.
-- **Contras:** custo mensal cresce com os serviços; no plano gratuito o serviço
-  "dorme" (cold start ruim para uso real) — para um cliente pagante, use um
-  plano pago always-on.
+---
 
-**Sugestão prática:** comece pela **Opção A (VPS + Caddy)** — é a mais barata,
-sempre ligada e aproveita o que já está pronto. Migre para a Opção B se
-quiser parar de administrar servidor conforme crescer para mais marcenarias.
+## Parte 2 — Domínio grátis (DuckDNS)
 
-### Exemplo de Caddyfile (Opção A)
+Você precisa de um endereço (`algumacoisa.com`) para o HTTPS automático
+funcionar — não dá para emitir certificado só para um número de IP. A opção
+100% grátis é o **DuckDNS**, que existe há anos e não tem custo nenhum:
+
+1. Acesse **https://www.duckdns.org** e entre com sua conta Google ou GitHub.
+2. No campo "subdomain", crie algo como `cutflow-suamarcenaria` → clique
+   **add domain**. Você terá `cutflow-suamarcenaria.duckdns.org`.
+3. No campo ao lado do domínio criado, cole o **IP público** da VM (Parte
+   1.4) e clique em **update ip**.
+
+Anote o domínio completo — é o que vamos usar no `.env` como `DOMAIN` e nas
+URLs. (Se no futuro preferir um domínio "de verdade", tipo
+`.com.br` (~R$ 40/ano), o processo é o mesmo: só aponta o DNS dele para o
+mesmo IP em vez de usar o DuckDNS.)
+
+---
+
+## Parte 3 — Conectar na VM e instalar o Docker
+
+### 3.1. Conectar por SSH
+
+No **PowerShell** do seu computador (Windows já vem com `ssh` embutido):
+
+```bash
+ssh -i "C:\caminho\para\ssh-key-....key" ubuntu@SEU_IP_PUBLICO
+```
+
+Na primeira conexão ele pergunta se confia no servidor — digite `yes`.
+
+> Se aparecer erro de permissão da chave, rode antes (uma vez):
+> `icacls "C:\caminho\para\ssh-key-....key" /inheritance:r /grant:r "%username%:R"`
+
+### 3.2. Instalar Docker
+
+Já dentro da VM (via SSH), copie e cole o bloco inteiro:
+
+```bash
+sudo apt update && sudo apt upgrade -y
+curl -fsSL https://get.docker.com | sudo sh
+sudo usermod -aG docker $USER
+```
+
+Depois, **saia e entre de novo** (`exit` e reconecte com o mesmo comando do
+3.1) para o grupo `docker` valer.
+
+Confirme que funcionou:
+
+```bash
+docker --version
+docker compose version
+```
+
+---
+
+## Parte 4 — Colocar o CutFlow na VM
+
+### 4.1. Clonar o projeto
+
+```bash
+git clone https://github.com/SEU-USUARIO/CutFlow.git
+cd CutFlow
+```
+
+(Se o repositório for privado, o `git clone` vai pedir usuário/senha — use
+um [personal access token](https://github.com/settings/tokens) do GitHub no
+lugar da senha.)
+
+### 4.2. Configurar o `.env` de produção
+
+```bash
+cp .env.example .env
+nano .env
+```
+
+Ajuste estas linhas (as outras podem ficar como estão):
 
 ```
-app.suamarcenaria.com.br {
-    handle /api/*        { reverse_proxy backend:8080 }
-    handle /oauth2/*     { reverse_proxy backend:8080 }
-    handle /login/oauth2/* { reverse_proxy backend:8080 }
-    handle               { reverse_proxy frontend:5173 }
-}
+DB_PASSWORD=escolha-uma-senha-forte-aqui
+CORS_ALLOWED_ORIGINS=https://cutflow-suamarcenaria.duckdns.org
+FRONTEND_URL=https://cutflow-suamarcenaria.duckdns.org
+DOMAIN=cutflow-suamarcenaria.duckdns.org
+SESSION_COOKIE_SECURE=true
 ```
 
-Para produção "de verdade", troque o frontend do modo dev (`npm run dev`) por um
-build estático (`npm run build`) servido pelo próprio Caddy — fica mais leve e
-rápido. O dev server atual funciona, mas não é o ideal para produção.
+Troque `cutflow-suamarcenaria.duckdns.org` pelo domínio que você criou na
+Parte 2. Para salvar no `nano`: `Ctrl+O`, `Enter`, depois `Ctrl+X` para sair.
+
+**Login com Google (opcional):** se quiser esse botão habilitado, veja
+"Login Google" mais abaixo antes de continuar — senão deixe
+`GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` em branco e só o login por e-mail/
+senha fica disponível (dá para habilitar o Google depois, a qualquer hora).
+
+### 4.3. Subir o CutFlow
+
+```bash
+docker compose -f docker-compose.prod.yml up -d --build
+```
+
+Isso demora alguns minutos na primeira vez (baixa imagens, compila o
+backend, gera o build do frontend). Acompanhe com:
+
+```bash
+docker compose -f docker-compose.prod.yml logs -f
+```
+
+(`Ctrl+C` só sai do acompanhamento — os containers continuam rodando.)
+
+### 4.4. Acessar
+
+Abra `https://cutflow-suamarcenaria.duckdns.org` no navegador. O Caddy emite
+o certificado HTTPS sozinho na primeira visita (pode levar de 10 a 60
+segundos na primeiríssima vez). Crie sua conta real e confirme que
+cadastro, criar projeto e gerar plano de corte funcionam.
+
+---
+
+## Login Google em produção (opcional)
+
+Se já usa o Google em desenvolvimento, é só adicionar mais um endereço
+autorizado — não precisa criar credenciais novas:
+
+1. [Google Cloud Console](https://console.cloud.google.com/) → **APIs e
+   Serviços → Credenciais** → abra seu OAuth Client existente.
+2. Em **Authorized redirect URIs**, adicione:
+   `https://cutflow-suamarcenaria.duckdns.org/login/oauth2/code/google`
+   (mantendo a URI de `localhost` também, se ainda usa em dev).
+3. Salve. Coloque o mesmo `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` no `.env`
+   da VM (Parte 4.2) e suba de novo:
+   `docker compose -f docker-compose.prod.yml up -d --build`.
+
+Se a tela de consentimento OAuth ainda estiver em modo "Testing", só
+e-mails cadastrados em **Usuários de teste** conseguem entrar — adicione lá
+os e-mails dos usuários reais, ou publique o app.
+
+---
+
+## Checklist de segurança antes de divulgar o link
+
+- [ ] `DB_PASSWORD` forte (não deixe o valor de exemplo)
+- [ ] `SESSION_COOKIE_SECURE=true` (já é o padrão no `docker-compose.prod.yml`)
+- [ ] `CORS_ALLOWED_ORIGINS`/`FRONTEND_URL`/`DOMAIN` = seu domínio real, não
+      `localhost`
+- [ ] Testou cadastro, login, criar projeto e gerar plano no domínio público
+- [ ] Backup configurado (Parte 5)
+- [ ] `.env` **nunca** commitado (já protegido pelo `.gitignore`)
+
+Note que `docker-compose.prod.yml` já cuida de dois pontos que não dá para
+esquecer manualmente: a conta de demonstração (`demo@cutflow.app`) não é
+criada em produção (o `seed.sql` só é usado em dev), e o Postgres não fica
+acessível pela internet (só o Caddy é exposto).
+
+---
+
+## Parte 5 — Backup automático (gratuito)
+
+Já existe um script pronto (`scripts/backup-db.sh`) que gera um dump
+comprimido do banco. Para rodar todo dia às 3h da manhã sozinho:
+
+```bash
+crontab -e
+```
+
+Adicione a linha (ajuste o caminho se clonou em outro lugar):
+
+```
+0 3 * * * cd /home/ubuntu/CutFlow && ./scripts/backup-db.sh >> backups/backup.log 2>&1
+```
+
+Os arquivos ficam em `CutFlow/backups/`, e o script já apaga sozinho
+backups com mais de 14 dias. Para restaurar um backup manualmente:
+
+```bash
+gunzip -c backups/cutflow_2026-08-01_030000.sql.gz | \
+  docker compose -f docker-compose.prod.yml exec -T db psql -U cutflow -d cutflow
+```
+
+**Dica extra (opcional, também grátis):** baixe os backups periodicamente
+para fora da VM (seu computador, Google Drive etc.) — se a VM tiver algum
+problema, um backup que só existe *dentro* dela não ajuda muito.
+
+---
+
+## Monitoramento gratuito (opcional, mas recomendado)
+
+Para saber se o site cair sem você precisar ficar checando:
+[UptimeRobot](https://uptimerobot.com) (plano grátis) — cadastre a URL do
+seu CutFlow e ele avisa por e-mail se parar de responder.
+
+---
+
+## Manutenção — o dia a dia depois do deploy
+
+### Publicar uma atualização (depois de eu implementar algo novo)
+
+Na VM, dentro da pasta `CutFlow`:
+
+```bash
+git pull
+docker compose -f docker-compose.prod.yml up -d --build
+```
+
+Isso reconstrói só o que mudou; o site fica fora do ar por poucos segundos
+(o tempo de trocar os containers), sem perder dados do banco.
+
+Se a atualização incluir uma **migração de banco** (arquivo novo em
+`db/migrations/`), rode-a antes do `up -d --build`:
+
+```bash
+docker compose -f docker-compose.prod.yml exec -T db \
+  psql -U cutflow -d cutflow < db/migrations/NOME_DA_MIGRACAO.sql
+```
+
+### Ver o que está acontecendo (logs)
+
+```bash
+docker compose -f docker-compose.prod.yml logs -f backend   # só o backend
+docker compose -f docker-compose.prod.yml logs -f           # tudo
+```
+
+### Reiniciar um serviço travado
+
+```bash
+docker compose -f docker-compose.prod.yml restart backend
+```
+
+### Se a VM inteira reiniciar (queda de energia, manutenção da Oracle etc.)
+
+Não precisa fazer nada: os containers têm `restart: unless-stopped` e o
+Docker sobe automaticamente com o sistema — o CutFlow volta sozinho.
+
+### Certificado HTTPS vencendo
+
+Também não precisa fazer nada — o Caddy renova sozinho, automaticamente,
+antes de vencer.
+
+### Trocar uma senha/segredo (`DB_PASSWORD`, credenciais do Google etc.)
+
+Edite o `.env` (`nano .env`) e suba de novo:
+
+```bash
+docker compose -f docker-compose.prod.yml up -d
+```
+
+### Manter o sistema operacional da VM em dia
+
+De vez em quando (ex.: 1x por mês):
+
+```bash
+sudo apt update && sudo apt upgrade -y
+sudo reboot
+```
+
+### Quando pensar em migrar para uma opção paga
+
+O plano Always Free da Oracle aguenta tranquilamente um cenário de "uma
+marcenaria, uso real" por muito tempo. Vale migrar para algo gerenciado
+(Render/Railway pagos, ou um Postgres gerenciado tipo Neon) quando: (a) você
+não quiser mais administrar servidor/backup manualmente, ou (b) o projeto
+crescer para várias marcenarias pagantes e precisar de mais capacidade,
+suporte e SLA do que uma VM sozinha oferece.
+
+---
+
+## O que mais vale considerar antes de divulgar (não bloqueia o deploy)
+
+Nenhum destes impede colocar no ar hoje — são melhorias de acabamento para
+quando fizer sentido:
+
+- **"Esqueci minha senha"**: hoje não existe (ver ADR-0005). Com poucos
+  usuários, dá para resetar manualmente pelo banco se alguém esquecer; virar
+  prioridade se a base de usuários crescer.
+- **Termos de uso / política de privacidade**: como o sistema agora guarda
+  contas e dados de clientes de terceiros, vale ter um texto simples,
+  principalmente se for oferecer a outras marcenarias além da piloto.
+- **Página de erro amigável**: se a API cair, o frontend hoje mostra uma
+  mensagem genérica de erro em vez de uma tela mais explicativa.

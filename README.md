@@ -89,7 +89,9 @@ CutFlow/
 - [x] MVP — cadastro de projeto/chapa/peça, algoritmo Guillotine, visualização, PDF
 - [x] Correção veio/liso + plano em tempo real (validado com projeto real do marceneiro-piloto)
 - [x] Contas, organizações (multi-tenant) e equipe — pré-deploy ([ADR-0005](docs/adr/0005-multi-tenant-e-autenticacao.md))
-- [ ] Deploy em produção para uso do marceneiro-piloto ([`docs/deploy.md`](docs/deploy.md))
+- [x] Espaço pessoal automático + compartilhamento direto de projeto ([ADR-0006](docs/adr/0006-espaco-pessoal-e-compartilhamento-de-projeto.md))
+- [x] Infraestrutura de produção pronta e testada (Docker + Caddy + HTTPS automático — [`docs/deploy.md`](docs/deploy.md))
+- [ ] Deploy em produção para uso do marceneiro-piloto
 - [ ] V2 — fita de borda, estoque de sobras entre projetos, histórico/comparação de planos, importação CSV, convite de membro por e-mail
 - [ ] V3 — múltiplas alternativas de plano, etiquetas com QR Code, bloco financeiro/comercial
 

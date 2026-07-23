@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.6.0] — Infraestrutura de produção
+
+Preparação para deploy real, testada de ponta a ponta localmente:
+
+- **`docker-compose.prod.yml`**: banco e backend sem porta pública (só o
+  serviço `edge` fica exposto à internet); `seed.sql` (conta de demonstração)
+  não roda em produção
+- **`frontend/Dockerfile.prod` + `Caddyfile`**: build estático de produção
+  (`npm run build`) servido pelo Caddy, com HTTPS automático (Let's Encrypt)
+  e reverse proxy para o backend na mesma origem — substitui o dev server
+  usado em desenvolvimento
+- **`scripts/backup-db.sh`**: backup diário do Postgres via cron, com
+  limpeza automática de backups antigos
+- Corrigido `.env.example`: a URI de redirect do Google em dev apontava para
+  a porta errada (8080 em vez de 5173, a origem real vista pelo navegador
+  via proxy do Vite); adicionada a variável `DOMAIN`
+- `docs/deploy.md` reescrito: passo a passo completo (Oracle Cloud Always
+  Free + DuckDNS, ambos gratuitos permanentemente) e seção de manutenção
+  (atualizações, logs, backup/restore, rotação de segredos)
+
 ## [0.5.0] — Espaço pessoal + compartilhamento de projeto
 
 Menos fricção e compartilhamento estilo Canva/Figma (ADR-0006):
