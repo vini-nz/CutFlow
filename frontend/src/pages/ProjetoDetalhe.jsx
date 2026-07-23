@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import api from '../services/api.js'
 import CanvasChapa from '../components/CanvasChapa.jsx'
 import PainelCompartilhar from '../components/PainelCompartilhar.jsx'
+import ModalEditarProjeto from '../components/ModalEditarProjeto.jsx'
 
 const ESPESSURAS = [6, 15, 18, 25]
 
@@ -53,6 +54,7 @@ export default function ProjetoDetalhe() {
   const [exportando, setExportando] = useState(false)
   const [chapaSelecionada, setChapaSelecionada] = useState(0)
   const [showCompartilhar, setShowCompartilhar] = useState(false)
+  const [showEditarProjeto, setShowEditarProjeto] = useState(false)
 
   // Regeneracao automatica ("tempo real"): cada mutacao bem-sucedida de
   // peca/chapa incrementa o tick; o efeito com debounce dispara a geracao.
@@ -299,11 +301,29 @@ export default function ProjetoDetalhe() {
       {showCompartilhar && (
         <PainelCompartilhar projetoUuid={uuid} onClose={() => setShowCompartilhar(false)} />
       )}
+      {showEditarProjeto && (
+        <ModalEditarProjeto
+          projeto={projeto}
+          onClose={() => setShowEditarProjeto(false)}
+          onSaved={(atualizado) => setProjeto((p) => ({ ...p, ...atualizado }))}
+        />
+      )}
 
       <header className="flex flex-wrap items-start justify-between gap-3 border-b border-gray-200 bg-white px-6 py-4">
         <div>
           <Link to="/" className="text-sm text-gray-500 hover:text-cutflow-700">← Projetos</Link>
-          <h1 className="mt-1 text-lg font-medium text-cutflow-900">{projeto.nome}</h1>
+          <div className="mt-1 flex items-center gap-2">
+            <h1 className="text-lg font-medium text-cutflow-900">{projeto.nome}</h1>
+            {!somenteLeitura && (
+              <button
+                onClick={() => setShowEditarProjeto(true)}
+                className="text-xs text-cutflow-700 hover:underline"
+                title="Editar projeto"
+              >
+                editar
+              </button>
+            )}
+          </div>
           {projeto.cliente && <p className="text-sm text-gray-500">Cliente: {projeto.cliente}</p>}
         </div>
         <div className="flex items-center gap-2">
