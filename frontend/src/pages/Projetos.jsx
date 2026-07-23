@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import api from '../services/api.js'
 import { useSession } from '../context/SessionContext.jsx'
+import Modal from '../components/Modal.jsx'
 
 const emptyForm = { nome: '', cliente: '' }
 
@@ -73,63 +74,60 @@ export default function Projetos() {
   }
 
   return (
-    <main className="p-6">
-      <div className="mb-4 flex items-center justify-between">
+    <main className="mx-auto max-w-5xl p-6">
+      {showForm && (
+        <Modal title="Novo projeto" onClose={() => setShowForm(false)}>
+          <form onSubmit={handleSubmit}>
+            <label className="mb-1 block text-sm text-gray-700">Nome *</label>
+            <input
+              required autoFocus value={form.nome}
+              onChange={(e) => setForm({ ...form, nome: e.target.value })}
+              placeholder="Ex: Armário Cozinha João"
+              className="mb-3 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-cutflow-600 focus:outline-none"
+            />
+            <label className="mb-1 block text-sm text-gray-700">Cliente</label>
+            <input
+              value={form.cliente}
+              onChange={(e) => setForm({ ...form, cliente: e.target.value })}
+              className="mb-4 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-cutflow-600 focus:outline-none"
+            />
+            {formError && <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{formError}</p>}
+            <div className="flex gap-2">
+              <button
+                type="submit" disabled={saving}
+                className="rounded-lg bg-cutflow-600 px-4 py-2 text-sm font-medium text-white hover:bg-cutflow-700 disabled:opacity-60"
+              >
+                {saving ? 'Salvando...' : 'Criar projeto'}
+              </button>
+              <button
+                type="button" onClick={() => setShowForm(false)}
+                className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+              >
+                Cancelar
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      <div className="mb-5 flex items-end justify-between">
         <div>
-          <h2 className="text-base font-medium text-gray-900">Projetos</h2>
+          <h2 className="text-xl font-semibold text-gray-900">Projetos</h2>
           <p className="text-sm text-gray-500">Plano de corte para marcenaria</p>
         </div>
         <button
           onClick={openCreateForm}
-          className="rounded bg-cutflow-600 px-4 py-2 text-sm font-medium text-white hover:bg-cutflow-700"
+          className="rounded-lg bg-cutflow-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-cutflow-700"
         >
-          Novo projeto
+          + Novo projeto
         </button>
       </div>
 
-      {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
+      {error && <p className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
 
-      {showForm && (
-        <form onSubmit={handleSubmit} className="mb-6 max-w-lg rounded-lg border border-gray-200 bg-white p-5">
-          <h3 className="mb-4 text-base font-medium text-gray-900">Novo projeto</h3>
-
-          <label className="mb-1 block text-sm text-gray-700">Nome *</label>
-          <input
-            required autoFocus value={form.nome}
-            onChange={(e) => setForm({ ...form, nome: e.target.value })}
-            placeholder="Ex: Armário Cozinha João"
-            className="mb-3 w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-cutflow-600 focus:outline-none"
-          />
-
-          <label className="mb-1 block text-sm text-gray-700">Cliente</label>
-          <input
-            value={form.cliente}
-            onChange={(e) => setForm({ ...form, cliente: e.target.value })}
-            className="mb-3 w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-cutflow-600 focus:outline-none"
-          />
-
-          {formError && <p className="mb-3 rounded bg-red-50 px-3 py-2 text-sm text-red-700">{formError}</p>}
-
-          <div className="flex gap-2">
-            <button
-              type="submit" disabled={saving}
-              className="rounded bg-cutflow-600 px-4 py-2 text-sm font-medium text-white hover:bg-cutflow-700 disabled:opacity-60"
-            >
-              {saving ? 'Salvando...' : 'Criar projeto'}
-            </button>
-            <button
-              type="button" onClick={() => setShowForm(false)}
-              className="rounded border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-            >
-              Cancelar
-            </button>
-          </div>
-        </form>
-      )}
-
-      <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
+      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
         <table className="w-full text-sm">
-          <thead className="bg-gray-50 text-left text-gray-500">
+          <thead className="border-b border-gray-100 bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
             <tr>
               <th className="px-4 py-3 font-medium">Projeto</th>
               <th className="px-4 py-3 font-medium">Cliente</th>
@@ -138,15 +136,17 @@ export default function Projetos() {
           </thead>
           <tbody>
             {loading && (
-              <tr><td colSpan={3} className="px-4 py-6 text-center text-gray-400">Carregando...</td></tr>
+              <tr><td colSpan={3} className="px-4 py-10 text-center text-gray-400">Carregando...</td></tr>
             )}
 
             {!loading && projetos.length === 0 && (
-              <tr><td colSpan={3} className="px-4 py-6 text-center text-gray-400">Nenhum projeto cadastrado.</td></tr>
+              <tr><td colSpan={3} className="px-4 py-10 text-center text-sm text-gray-400">
+                Nenhum projeto ainda. Clique em <span className="font-medium text-gray-500">+ Novo projeto</span> para começar.
+              </td></tr>
             )}
 
             {projetos.map((projeto) => (
-              <tr key={projeto.uuid} className="border-t border-gray-100">
+              <tr key={projeto.uuid} className="border-t border-gray-100 hover:bg-gray-50/60">
                 <td className="px-4 py-3">
                   <Link to={`/projetos/${projeto.uuid}`} className="font-medium text-cutflow-700 hover:underline">
                     {projeto.nome}
@@ -154,7 +154,7 @@ export default function Projetos() {
                 </td>
                 <td className="px-4 py-3 text-gray-600">{projeto.cliente || '—'}</td>
                 <td className="px-4 py-3 text-right">
-                  <button onClick={() => handleDelete(projeto)} className="text-red-600 hover:underline">
+                  <button onClick={() => handleDelete(projeto)} className="text-sm text-red-600 hover:underline">
                     Remover
                   </button>
                 </td>
@@ -166,12 +166,12 @@ export default function Projetos() {
 
       {/* Compartilhados comigo (ADR-0006): projetos de outras pessoas/organizações */}
       {compartilhados.length > 0 && (
-        <div className="mt-8">
-          <h2 className="mb-1 text-base font-medium text-gray-900">Compartilhados comigo</h2>
+        <div className="mt-10">
+          <h2 className="text-lg font-semibold text-gray-900">Compartilhados comigo</h2>
           <p className="mb-3 text-sm text-gray-500">Projetos que alguém compartilhou diretamente com você.</p>
-          <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
+          <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
             <table className="w-full text-sm">
-              <thead className="bg-gray-50 text-left text-gray-500">
+              <thead className="border-b border-gray-100 bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
                 <tr>
                   <th className="px-4 py-3 font-medium">Projeto</th>
                   <th className="px-4 py-3 font-medium">Cliente</th>
@@ -180,7 +180,7 @@ export default function Projetos() {
               </thead>
               <tbody>
                 {compartilhados.map((projeto) => (
-                  <tr key={projeto.uuid} className="border-t border-gray-100">
+                  <tr key={projeto.uuid} className="border-t border-gray-100 hover:bg-gray-50/60">
                     <td className="px-4 py-3">
                       <Link to={`/projetos/${projeto.uuid}`} className="font-medium text-cutflow-700 hover:underline">
                         {projeto.nome}
@@ -188,7 +188,7 @@ export default function Projetos() {
                     </td>
                     <td className="px-4 py-3 text-gray-600">{projeto.cliente || '—'}</td>
                     <td className="px-4 py-3">
-                      <span className={`rounded px-1.5 py-0.5 text-[11px] font-medium ${
+                      <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${
                         projeto.podeEditar ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'
                       }`}>
                         {projeto.podeEditar ? 'editor' : 'somente leitura'}

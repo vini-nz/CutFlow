@@ -4,6 +4,7 @@ import api from '../services/api.js'
 import CanvasChapa from '../components/CanvasChapa.jsx'
 import PainelCompartilhar from '../components/PainelCompartilhar.jsx'
 import ModalEditarProjeto from '../components/ModalEditarProjeto.jsx'
+import Modal from '../components/Modal.jsx'
 
 const ESPESSURAS = [6, 15, 18, 25]
 
@@ -292,6 +293,7 @@ export default function ProjetoDetalhe() {
   }
 
   const chapaDoPlano = plano?.chapas[chapaSelecionada]
+  const chapaEmEdicao = chapas.find((c) => c.uuid === chapaEditandoUuid)
   // Colaborador VISUALIZADOR (ADR-0006): projeto abre normalmente, mas sem
   // controles de edição. O backend recusa qualquer mutação (403) de qualquer forma.
   const somenteLeitura = projeto.podeEditar === false
@@ -307,6 +309,54 @@ export default function ProjetoDetalhe() {
           onClose={() => setShowEditarProjeto(false)}
           onSaved={(atualizado) => setProjeto((p) => ({ ...p, ...atualizado }))}
         />
+      )}
+      {chapaEmEdicao && (
+        <Modal
+          title={`Editar chapa ${chapaEmEdicao.espessuraMm}mm · ${rotuloAcabamento(chapaEmEdicao.tipoAcabamento)}`}
+          onClose={() => setChapaEditandoUuid(null)}
+        >
+          <form onSubmit={handleChapaSubmit}>
+            <div className="mb-3 grid grid-cols-2 gap-2">
+              <div>
+                <label className="mb-1 block text-xs text-gray-600">Largura (mm)</label>
+                <input type="number" required value={chapaForm.larguraMm}
+                  onChange={(e) => setChapaForm({ ...chapaForm, larguraMm: Number(e.target.value) })}
+                  className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm focus:border-cutflow-600 focus:outline-none" />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs text-gray-600">Altura (mm)</label>
+                <input type="number" required value={chapaForm.alturaMm}
+                  onChange={(e) => setChapaForm({ ...chapaForm, alturaMm: Number(e.target.value) })}
+                  className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm focus:border-cutflow-600 focus:outline-none" />
+              </div>
+            </div>
+            <div className="mb-3 grid grid-cols-2 gap-2">
+              <div>
+                <label className="mb-1 block text-xs text-gray-600">Kerf (mm)</label>
+                <input type="number" value={chapaForm.kerfMm}
+                  onChange={(e) => setChapaForm({ ...chapaForm, kerfMm: Number(e.target.value) })}
+                  className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm focus:border-cutflow-600 focus:outline-none" />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs text-gray-600">Margem borda (mm)</label>
+                <input type="number" value={chapaForm.margemBordaMm}
+                  onChange={(e) => setChapaForm({ ...chapaForm, margemBordaMm: Number(e.target.value) })}
+                  className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm focus:border-cutflow-600 focus:outline-none" />
+              </div>
+            </div>
+            {chapaFormError && <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{chapaFormError}</p>}
+            <div className="flex gap-2">
+              <button type="submit" disabled={savingChapa}
+                className="rounded-lg bg-cutflow-600 px-4 py-2 text-sm font-medium text-white hover:bg-cutflow-700 disabled:opacity-60">
+                {savingChapa ? 'Salvando...' : 'Salvar'}
+              </button>
+              <button type="button" onClick={() => setChapaEditandoUuid(null)}
+                className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                Cancelar
+              </button>
+            </div>
+          </form>
+        </Modal>
       )}
 
       <header className="flex flex-wrap items-start justify-between gap-3 border-b border-gray-200 bg-white px-6 py-4">
@@ -375,7 +425,7 @@ export default function ProjetoDetalhe() {
         {/* Coluna esquerda: chapas (uma por espessura+acabamento, sem cadastro manual) */}
         <section className="lg:col-span-1">
           <div className="mb-3">
-            <h2 className="text-base font-medium text-gray-900">Chapas</h2>
+            <h2 className="text-base font-semibold text-gray-900">Chapas</h2>
             <p className="text-xs text-gray-500">
               Criadas automaticamente por espessura e acabamento conforme você adiciona peças. Peça com veio
               nunca é cortada em chapa lisa (e vice-versa).
@@ -389,83 +439,34 @@ export default function ProjetoDetalhe() {
               <p className="text-sm text-gray-400">Nenhuma chapa ainda — adicione uma peça para gerar a primeira.</p>
             )}
             {chapas.map((chapa) => (
-              <div key={chapa.uuid} className="rounded-lg border border-gray-200 bg-white p-3">
-                {chapaEditandoUuid === chapa.uuid ? (
-                  <form onSubmit={handleChapaSubmit}>
-                    <p className="mb-2 text-xs font-medium text-gray-700">
-                      Chapa {chapa.espessuraMm}mm · {rotuloAcabamento(chapa.tipoAcabamento)}
+              <div key={chapa.uuid} className="rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="text-sm font-medium text-gray-900">
+                      {chapa.larguraMm}x{chapa.alturaMm}mm — {chapa.espessuraMm}mm
+                    </span>
+                    <span className={`ml-2 rounded-full px-2 py-0.5 text-[11px] font-medium ${
+                      chapa.tipoAcabamento === 'COM_VEIO'
+                        ? 'bg-amber-100 text-amber-800'
+                        : 'bg-gray-100 text-gray-600'
+                    }`}>
+                      {rotuloAcabamento(chapa.tipoAcabamento)}
+                    </span>
+                    <p className="mt-1 text-xs text-gray-500">
+                      {chapa.material} · kerf {chapa.kerfMm}mm · margem {chapa.margemBordaMm}mm
                     </p>
-                    <div className="mb-2 grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="mb-1 block text-xs text-gray-600">Largura (mm)</label>
-                        <input type="number" required value={chapaForm.larguraMm}
-                          onChange={(e) => setChapaForm({ ...chapaForm, larguraMm: Number(e.target.value) })}
-                          className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-cutflow-600 focus:outline-none" />
-                      </div>
-                      <div>
-                        <label className="mb-1 block text-xs text-gray-600">Altura (mm)</label>
-                        <input type="number" required value={chapaForm.alturaMm}
-                          onChange={(e) => setChapaForm({ ...chapaForm, alturaMm: Number(e.target.value) })}
-                          className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-cutflow-600 focus:outline-none" />
-                      </div>
-                    </div>
-                    <div className="mb-2 grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="mb-1 block text-xs text-gray-600">Kerf (mm)</label>
-                        <input type="number" value={chapaForm.kerfMm}
-                          onChange={(e) => setChapaForm({ ...chapaForm, kerfMm: Number(e.target.value) })}
-                          className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-cutflow-600 focus:outline-none" />
-                      </div>
-                      <div>
-                        <label className="mb-1 block text-xs text-gray-600">Margem borda (mm)</label>
-                        <input type="number" value={chapaForm.margemBordaMm}
-                          onChange={(e) => setChapaForm({ ...chapaForm, margemBordaMm: Number(e.target.value) })}
-                          className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-cutflow-600 focus:outline-none" />
-                      </div>
-                    </div>
-
-                    {chapaFormError && <p className="mb-2 rounded bg-red-50 px-3 py-2 text-sm text-red-700">{chapaFormError}</p>}
-
-                    <div className="flex gap-2">
-                      <button type="submit" disabled={savingChapa}
-                        className="rounded bg-cutflow-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-cutflow-700 disabled:opacity-60">
-                        {savingChapa ? 'Salvando...' : 'Salvar'}
-                      </button>
-                      <button type="button" onClick={() => setChapaEditandoUuid(null)}
-                        className="rounded border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100">
-                        Cancelar
-                      </button>
-                    </div>
-                  </form>
-                ) : (
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <span className="text-sm font-medium text-gray-900">
-                        {chapa.larguraMm}x{chapa.alturaMm}mm — {chapa.espessuraMm}mm
-                      </span>
-                      <span className={`ml-2 rounded px-1.5 py-0.5 text-[11px] font-medium ${
-                        chapa.tipoAcabamento === 'COM_VEIO'
-                          ? 'bg-amber-100 text-amber-800'
-                          : 'bg-gray-100 text-gray-600'
-                      }`}>
-                        {rotuloAcabamento(chapa.tipoAcabamento)}
-                      </span>
-                      <p className="mt-1 text-xs text-gray-500">
-                        {chapa.material} · kerf {chapa.kerfMm}mm · margem {chapa.margemBordaMm}mm
-                      </p>
-                    </div>
-                    {!somenteLeitura && (
-                      <div className="flex shrink-0 gap-3">
-                        <button onClick={() => abrirEdicaoChapa(chapa)} className="text-xs text-cutflow-700 hover:underline">
-                          Editar
-                        </button>
-                        <button onClick={() => handleDeleteChapa(chapa)} className="text-xs text-red-600 hover:underline">
-                          Excluir
-                        </button>
-                      </div>
-                    )}
                   </div>
-                )}
+                  {!somenteLeitura && (
+                    <div className="flex shrink-0 gap-3">
+                      <button onClick={() => abrirEdicaoChapa(chapa)} className="text-xs text-cutflow-700 hover:underline">
+                        Editar
+                      </button>
+                      <button onClick={() => handleDeleteChapa(chapa)} className="text-xs text-red-600 hover:underline">
+                        Excluir
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             ))}
           </div>
@@ -474,11 +475,11 @@ export default function ProjetoDetalhe() {
         {/* Coluna central: pecas */}
         <section className="lg:col-span-1">
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-base font-medium text-gray-900">Peças</h2>
+            <h2 className="text-base font-semibold text-gray-900">Peças</h2>
             {!somenteLeitura && (
               <button
-                onClick={() => (showPecaForm ? setShowPecaForm(false) : abrirNovaPeca())}
-                className="rounded bg-cutflow-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-cutflow-700"
+                onClick={abrirNovaPeca}
+                className="rounded-lg bg-cutflow-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-cutflow-700"
               >
                 + Peça
               </button>
@@ -486,78 +487,80 @@ export default function ProjetoDetalhe() {
           </div>
 
           {showPecaForm && (
-            <form onSubmit={handlePecaSubmit} className="mb-4 rounded-lg border border-gray-200 bg-white p-4">
-              <p className="mb-2 text-xs font-medium text-gray-700">
-                {pecaEditandoUuid ? 'Editar peça' : 'Nova peça'}
-              </p>
-              <label className="mb-1 block text-xs text-gray-600">Nome</label>
-              <input required autoFocus value={pecaForm.nome} placeholder="Ex: Lateral, Prateleira..."
-                onChange={(e) => setPecaForm({ ...pecaForm, nome: e.target.value })}
-                className="mb-3 w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-cutflow-600 focus:outline-none" />
+            <Modal
+              title={pecaEditandoUuid ? 'Editar peça' : 'Nova peça'}
+              onClose={() => { setShowPecaForm(false); setPecaEditandoUuid(null) }}
+            >
+              <form onSubmit={handlePecaSubmit}>
+                <label className="mb-1 block text-xs text-gray-600">Nome</label>
+                <input required autoFocus value={pecaForm.nome} placeholder="Ex: Lateral, Prateleira..."
+                  onChange={(e) => setPecaForm({ ...pecaForm, nome: e.target.value })}
+                  className="mb-3 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-cutflow-600 focus:outline-none" />
 
-              <div className="mb-3 grid grid-cols-2 gap-2">
-                <div>
-                  <label className="mb-1 block text-xs text-gray-600">Largura (mm)</label>
-                  <input type="number" required value={pecaForm.larguraMm}
-                    onChange={(e) => setPecaForm({ ...pecaForm, larguraMm: Number(e.target.value) })}
-                    className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-cutflow-600 focus:outline-none" />
+                <div className="mb-3 grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="mb-1 block text-xs text-gray-600">Largura (mm)</label>
+                    <input type="number" required value={pecaForm.larguraMm}
+                      onChange={(e) => setPecaForm({ ...pecaForm, larguraMm: Number(e.target.value) })}
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-cutflow-600 focus:outline-none" />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs text-gray-600">Altura (mm)</label>
+                    <input type="number" required value={pecaForm.alturaMm}
+                      onChange={(e) => setPecaForm({ ...pecaForm, alturaMm: Number(e.target.value) })}
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-cutflow-600 focus:outline-none" />
+                  </div>
                 </div>
-                <div>
-                  <label className="mb-1 block text-xs text-gray-600">Altura (mm)</label>
-                  <input type="number" required value={pecaForm.alturaMm}
-                    onChange={(e) => setPecaForm({ ...pecaForm, alturaMm: Number(e.target.value) })}
-                    className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-cutflow-600 focus:outline-none" />
+
+                <div className="mb-3 grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="mb-1 block text-xs text-gray-600">Espessura</label>
+                    <select value={pecaForm.espessuraMm}
+                      onChange={(e) => setPecaForm({ ...pecaForm, espessuraMm: Number(e.target.value) })}
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-cutflow-600 focus:outline-none">
+                      {ESPESSURAS.map((esp) => <option key={esp} value={esp}>{esp}mm</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs text-gray-600">Quantidade</label>
+                    <input type="number" required min={1} value={pecaForm.quantidade}
+                      onChange={(e) => setPecaForm({ ...pecaForm, quantidade: Number(e.target.value) })}
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-cutflow-600 focus:outline-none" />
+                  </div>
                 </div>
-              </div>
 
-              <div className="mb-3 grid grid-cols-2 gap-2">
-                <div>
-                  <label className="mb-1 block text-xs text-gray-600">Espessura</label>
-                  <select value={pecaForm.espessuraMm}
-                    onChange={(e) => setPecaForm({ ...pecaForm, espessuraMm: Number(e.target.value) })}
-                    className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-cutflow-600 focus:outline-none">
-                    {ESPESSURAS.map((esp) => <option key={esp} value={esp}>{esp}mm</option>)}
-                  </select>
+                <label className="mb-1 block text-xs text-gray-600">Acabamento</label>
+                <select value={pecaForm.tipoAcabamento}
+                  onChange={(e) => setPecaForm({ ...pecaForm, tipoAcabamento: e.target.value })}
+                  className="mb-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-cutflow-600 focus:outline-none">
+                  <option value="LISO">Liso (pode girar)</option>
+                  <option value="COM_VEIO">Com veio (lado certo)</option>
+                </select>
+                <p className="mb-3 text-[11px] text-gray-400">
+                  O acabamento vem de fábrica na chapa: peças com veio saem de chapa com veio, lisas de chapa lisa.
+                </p>
+
+                {pecaFormError && <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{pecaFormError}</p>}
+
+                <div className="flex gap-2">
+                  <button type="submit" disabled={savingPeca}
+                    className="rounded-lg bg-cutflow-600 px-4 py-2 text-sm font-medium text-white hover:bg-cutflow-700 disabled:opacity-60">
+                    {savingPeca ? 'Salvando...' : 'Salvar'}
+                  </button>
+                  <button type="button" onClick={() => { setShowPecaForm(false); setPecaEditandoUuid(null) }}
+                    className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                    Cancelar
+                  </button>
                 </div>
-                <div>
-                  <label className="mb-1 block text-xs text-gray-600">Quantidade</label>
-                  <input type="number" required min={1} value={pecaForm.quantidade}
-                    onChange={(e) => setPecaForm({ ...pecaForm, quantidade: Number(e.target.value) })}
-                    className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-cutflow-600 focus:outline-none" />
-                </div>
-              </div>
-
-              <label className="mb-1 block text-xs text-gray-600">Acabamento</label>
-              <select value={pecaForm.tipoAcabamento}
-                onChange={(e) => setPecaForm({ ...pecaForm, tipoAcabamento: e.target.value })}
-                className="mb-1 w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-cutflow-600 focus:outline-none">
-                <option value="LISO">Liso (pode girar)</option>
-                <option value="COM_VEIO">Com veio (lado certo)</option>
-              </select>
-              <p className="mb-3 text-[11px] text-gray-400">
-                O acabamento vem de fábrica na chapa: peças com veio saem de chapa com veio, lisas de chapa lisa.
-              </p>
-
-              {pecaFormError && <p className="mb-3 rounded bg-red-50 px-3 py-2 text-sm text-red-700">{pecaFormError}</p>}
-
-              <div className="flex gap-2">
-                <button type="submit" disabled={savingPeca}
-                  className="rounded bg-cutflow-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-cutflow-700 disabled:opacity-60">
-                  {savingPeca ? 'Salvando...' : 'Salvar'}
-                </button>
-                <button type="button" onClick={() => { setShowPecaForm(false); setPecaEditandoUuid(null) }}
-                  className="rounded border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100">
-                  Cancelar
-                </button>
-              </div>
-            </form>
+              </form>
+            </Modal>
           )}
 
-          {pecasError && <p className="mb-2 rounded bg-red-50 px-3 py-2 text-sm text-red-700">{pecasError}</p>}
+          {pecasError && <p className="mb-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{pecasError}</p>}
 
-          <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
+          <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
             <table className="w-full text-sm">
-              <thead className="bg-gray-50 text-left text-gray-500">
+              <thead className="border-b border-gray-100 bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
                 <tr>
                   <th className="px-3 py-2 font-medium">Peça</th>
                   <th className="px-3 py-2 font-medium">Medidas</th>
@@ -599,7 +602,7 @@ export default function ProjetoDetalhe() {
               <button
                 onClick={() => gerarPlano()}
                 disabled={gerando || pecas.length === 0}
-                className="mt-4 w-full rounded bg-cutflow-700 px-4 py-3 text-sm font-semibold text-white hover:bg-cutflow-900 disabled:opacity-50"
+                className="mt-4 w-full rounded-lg bg-cutflow-700 px-4 py-3 text-sm font-semibold text-white shadow-sm hover:bg-cutflow-900 disabled:opacity-50"
               >
                 {gerando ? 'Gerando plano...' : 'Gerar plano de corte'}
               </button>
@@ -608,22 +611,22 @@ export default function ProjetoDetalhe() {
               </p>
             </>
           )}
-          {planoError && <p className="mt-2 rounded bg-red-50 px-3 py-2 text-sm text-red-700">{planoError}</p>}
+          {planoError && <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{planoError}</p>}
         </section>
 
         {/* Coluna direita: visualizacao do plano */}
         <section className="lg:col-span-1">
           <div className="mb-3 flex items-center gap-2">
-            <h2 className="text-base font-medium text-gray-900">Visualização</h2>
+            <h2 className="text-base font-semibold text-gray-900">Visualização</h2>
             {gerandoAuto && (
-              <span className="rounded bg-cutflow-50 px-2 py-0.5 text-[11px] font-medium text-cutflow-700">
+              <span className="rounded-full bg-cutflow-50 px-2 py-0.5 text-[11px] font-medium text-cutflow-700">
                 Atualizando plano...
               </span>
             )}
           </div>
 
           {!plano && (
-            <div className="rounded-lg border border-dashed border-gray-300 bg-white p-6 text-center text-sm text-gray-400">
+            <div className="rounded-xl border border-dashed border-gray-300 bg-white p-8 text-center text-sm text-gray-400">
               {pecas.length === 0
                 ? 'Adicione peças — o plano de corte aparece aqui sozinho.'
                 : 'Gere o plano de corte para visualizar as chapas.'}
@@ -631,13 +634,13 @@ export default function ProjetoDetalhe() {
           )}
 
           {plano && (
-            <div className="rounded-lg border border-gray-200 bg-white p-4">
+            <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
               <div className="mb-3 flex flex-wrap gap-1">
                 {plano.chapas.map((chapa, index) => (
                   <button
                     key={chapa.uuid}
                     onClick={() => setChapaSelecionada(index)}
-                    className={`rounded px-3 py-1 text-xs font-medium ${
+                    className={`rounded-lg px-3 py-1 text-xs font-medium ${
                       index === chapaSelecionada
                         ? 'bg-cutflow-600 text-white'
                         : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
@@ -676,7 +679,7 @@ export default function ProjetoDetalhe() {
               <button
                 onClick={handleExportarPdf}
                 disabled={exportando}
-                className="mt-4 w-full rounded border border-cutflow-600 px-4 py-2 text-sm font-medium text-cutflow-700 hover:bg-cutflow-50 disabled:opacity-50"
+                className="mt-4 w-full rounded-lg border border-cutflow-600 px-4 py-2 text-sm font-medium text-cutflow-700 hover:bg-cutflow-50 disabled:opacity-50"
               >
                 {exportando ? 'Exportando...' : 'Exportar PDF'}
               </button>
